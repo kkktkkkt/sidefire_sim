@@ -1,0 +1,1255 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SideFIRE シミュレータ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+<style>
+  :root {
+    --bg-primary: #0d1117;
+    --bg-secondary: #161b22;
+    --bg-tertiary: #21262d;
+    --bg-card: #1c2128;
+    --border: #30363d;
+    --border-light: #3d444d;
+    --text-primary: #e6edf3;
+    --text-secondary: #8b949e;
+    --text-muted: #656d76;
+    --accent-blue: #388bfd;
+    --accent-green: #2ea043;
+    --accent-orange: #d29922;
+    --accent-red: #f85149;
+    --accent-purple: #a371f7;
+    --accent-teal: #2dd4bf;
+    --gradient-blue: linear-gradient(135deg, #1a4a8a, #388bfd);
+    --gradient-green: linear-gradient(135deg, #1a5c2e, #2ea043);
+    --gradient-orange: linear-gradient(135deg, #7a4f00, #d29922);
+    --gradient-purple: linear-gradient(135deg, #4a2080, #a371f7);
+    --radius: 10px;
+    --radius-sm: 6px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter', 'Noto Sans JP', sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── Header ── */
+  header {
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border);
+    padding: 0 28px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.5);
+  }
+  header .logo {
+    width: 32px; height: 32px;
+    background: var(--gradient-blue);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; flex-shrink: 0;
+  }
+  header h1 {
+    font-size: 18px; font-weight: 600; letter-spacing: 0.5px;
+    background: linear-gradient(135deg, #e6edf3, #8b949e);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  }
+  header .subtitle { font-size: 12px; color: var(--text-muted); margin-left: 4px; font-weight: 300; }
+
+  /* ── Layout ── */
+  .main-layout { display: flex; flex: 1; overflow: hidden; height: calc(100vh - 60px); }
+
+  /* ── Sidebar ── */
+  .sidebar {
+    width: 310px; min-width: 310px;
+    background: var(--bg-secondary);
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    padding: 20px 16px;
+    display: flex; flex-direction: column; gap: 16px;
+  }
+  .sidebar::-webkit-scrollbar { width: 4px; }
+  .sidebar::-webkit-scrollbar-track { background: transparent; }
+  .sidebar::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 2px; }
+
+  .section-label {
+    font-size: 10px; font-weight: 600; letter-spacing: 1.5px;
+    color: var(--text-muted); text-transform: uppercase;
+    margin-bottom: 10px; padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+  }
+  .form-group { margin-bottom: 12px; }
+  .form-group label { display: block; font-size: 12px; color: var(--text-secondary); margin-bottom: 5px; font-weight: 500; }
+  .form-group input[type="number"] {
+    width: 100%; background: var(--bg-tertiary);
+    border: 1px solid var(--border); border-radius: var(--radius-sm);
+    color: var(--text-primary); padding: 8px 10px; font-size: 14px; font-family: inherit;
+    transition: border-color 0.15s; -moz-appearance: textfield;
+  }
+  .form-group input[type="number"]::-webkit-inner-spin-button,
+  .form-group input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; }
+  .form-group input[type="number"]:focus {
+    outline: none; border-color: var(--accent-blue);
+    box-shadow: 0 0 0 3px rgba(56,139,253,0.15);
+  }
+  .input-suffix { display: flex; align-items: center; }
+  .input-suffix input { border-radius: var(--radius-sm) 0 0 var(--radius-sm) !important; flex: 1; }
+  .input-suffix .suffix {
+    background: var(--bg-card); border: 1px solid var(--border); border-left: none;
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    padding: 8px 8px; font-size: 12px; color: var(--text-muted); white-space: nowrap;
+  }
+
+  /* ── Sliders ── */
+  .slider-group { margin-bottom: 14px; }
+  .slider-label-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 7px; }
+  .slider-label-row label { font-size: 12px; color: var(--text-secondary); font-weight: 500; }
+  .slider-value {
+    font-size: 14px; font-weight: 600; color: var(--accent-blue);
+    background: rgba(56,139,253,0.1); padding: 2px 8px; border-radius: 4px;
+    min-width: 50px; text-align: center;
+  }
+  input[type="range"] {
+    width: 100%; height: 4px; -webkit-appearance: none;
+    background: var(--bg-tertiary); border-radius: 2px; outline: none; cursor: pointer;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%;
+    background: var(--accent-blue); box-shadow: 0 0 0 3px rgba(56,139,253,0.3);
+    cursor: pointer; transition: transform 0.1s;
+  }
+  input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.15); }
+
+  /* ── Children ── */
+  .children-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .btn-add {
+    background: rgba(46,160,67,0.15); border: 1px solid rgba(46,160,67,0.4);
+    color: var(--accent-green); padding: 5px 10px; border-radius: var(--radius-sm);
+    font-size: 12px; cursor: pointer; font-family: inherit; font-weight: 500; transition: all 0.15s;
+  }
+  .btn-add:hover { background: rgba(46,160,67,0.25); border-color: var(--accent-green); }
+
+  .child-card {
+    background: var(--bg-tertiary); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: 12px; margin-bottom: 10px;
+  }
+  .child-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .child-card-title {
+    font-size: 12px; font-weight: 600; color: var(--accent-purple);
+    display: flex; align-items: center; gap: 6px;
+  }
+  .child-card-title::before {
+    content: ''; display: inline-block; width: 6px; height: 6px;
+    border-radius: 50%; background: var(--accent-purple);
+  }
+  .btn-remove {
+    background: none; border: none; color: var(--text-muted); cursor: pointer;
+    font-size: 16px; padding: 2px 6px; border-radius: 4px; transition: all 0.15s; line-height: 1;
+  }
+  .btn-remove:hover { background: rgba(248,81,73,0.15); color: var(--accent-red); }
+  .child-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .child-grid .full-width { grid-column: 1 / -1; }
+  .form-group select {
+    width: 100%; background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); color: var(--text-primary);
+    padding: 7px 8px; font-size: 12px; font-family: inherit; cursor: pointer; transition: border-color 0.15s;
+  }
+  .form-group select:focus { outline: none; border-color: var(--accent-blue); }
+
+  /* ── Custom fee toggle ── */
+  .custom-fee-toggle {
+    display: flex; align-items: center; gap: 6px; cursor: pointer;
+    margin-top: 8px; padding: 5px 0; user-select: none;
+  }
+  .toggle-indicator {
+    width: 28px; height: 16px; background: var(--bg-card);
+    border: 1px solid var(--border-light); border-radius: 8px;
+    position: relative; transition: background 0.2s; flex-shrink: 0;
+  }
+  .toggle-indicator::after {
+    content: ''; position: absolute; left: 2px; top: 2px;
+    width: 10px; height: 10px; border-radius: 50%;
+    background: var(--text-muted); transition: transform 0.2s, background 0.2s;
+  }
+  .toggle-indicator.on { background: rgba(56,139,253,0.3); border-color: var(--accent-blue); }
+  .toggle-indicator.on::after { transform: translateX(12px); background: var(--accent-blue); }
+  .toggle-text { font-size: 11px; color: var(--text-muted); }
+
+  .custom-fee-panel {
+    display: none; margin-top: 8px; padding: 8px;
+    background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius-sm);
+  }
+  .custom-fee-panel.open { display: block; }
+  .custom-fee-panel .form-group { margin-bottom: 7px; }
+  .custom-fee-panel .form-group:last-child { margin-bottom: 0; }
+  .custom-fee-panel label { font-size: 11px; }
+  .custom-fee-panel input { font-size: 12px; padding: 5px 8px; }
+
+  /* ── Content ── */
+  .content {
+    flex: 1; overflow-y: auto; padding: 20px 24px;
+    display: flex; flex-direction: column; gap: 16px;
+  }
+  .content::-webkit-scrollbar { width: 6px; }
+  .content::-webkit-scrollbar-track { background: transparent; }
+  .content::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 3px; }
+
+  /* ── Result Cards ── */
+  .cards-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .result-card {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 16px; position: relative; overflow: hidden;
+  }
+  .result-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; }
+  .result-card.blue::before  { background: var(--gradient-blue); }
+  .result-card.green::before { background: var(--gradient-green); }
+  .result-card.orange::before{ background: var(--gradient-orange); }
+  .result-card.purple::before{ background: var(--gradient-purple); }
+  .card-label {
+    font-size: 11px; color: var(--text-muted); font-weight: 500;
+    letter-spacing: 0.5px; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;
+  }
+  .card-icon { width: 20px; height: 20px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 10px; }
+  .card-icon.blue   { background: rgba(56,139,253,0.2); }
+  .card-icon.green  { background: rgba(46,160,67,0.2); }
+  .card-icon.orange { background: rgba(210,153,34,0.2); }
+  .card-icon.purple { background: rgba(163,113,247,0.2); }
+  .card-value { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; line-height: 1.2; margin-bottom: 4px; }
+  .card-value.blue   { color: var(--accent-blue); }
+  .card-value.green  { color: var(--accent-green); }
+  .card-value.orange { color: var(--accent-orange); }
+  .card-value.purple { color: var(--accent-purple); }
+  .card-sub { font-size: 11px; color: var(--text-muted); }
+
+  /* ── Banner ── */
+  .banner {
+    padding: 12px 16px; border-radius: var(--radius-sm);
+    font-size: 13px; font-weight: 500;
+    display: none; align-items: center; gap: 8px; border: 1px solid;
+  }
+  .banner.show { display: flex; }
+  .banner.success { background: rgba(46,160,67,0.12); border-color: rgba(46,160,67,0.4); color: #4ac26b; }
+  .banner.info    { background: rgba(56,139,253,0.12); border-color: rgba(56,139,253,0.4); color: #79c0ff; }
+  .banner.warning { background: rgba(248,81,73,0.12); border-color: rgba(248,81,73,0.4); color: #ff9492; }
+
+  /* ── Chart ── */
+  .chart-panel {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 20px;
+  }
+  .chart-panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+  .chart-title { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+  .chart-legend { display: flex; gap: 16px; flex-wrap: wrap; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-secondary); }
+  .legend-dot  { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+  .legend-line { width: 20px; height: 2px; flex-shrink: 0; border-top: 2px dashed; }
+  .chart-container { position: relative; height: 360px; }
+
+  /* ── Tables ── */
+  .table-panel {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 20px;
+  }
+  .table-title { font-size: 14px; font-weight: 600; margin-bottom: 14px; color: var(--text-primary); }
+  .table-scroll { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead th {
+    padding: 8px 12px; text-align: left;
+    font-size: 11px; font-weight: 600; color: var(--text-muted);
+    letter-spacing: 0.5px; text-transform: uppercase;
+    border-bottom: 1px solid var(--border); background: var(--bg-tertiary);
+    white-space: nowrap;
+  }
+  thead th:first-child { border-radius: var(--radius-sm) 0 0 0; }
+  thead th:last-child  { border-radius: 0 var(--radius-sm) 0 0; }
+  tbody tr { border-bottom: 1px solid var(--border); transition: background 0.1s; }
+  tbody tr:hover { background: rgba(255,255,255,0.03); }
+  tbody tr:last-child { border-bottom: none; }
+  tbody td { padding: 8px 12px; color: var(--text-secondary); font-size: 12px; white-space: nowrap; }
+  tbody td:first-child { color: var(--text-primary); font-weight: 500; }
+  td.num  { font-variant-numeric: tabular-nums; color: var(--accent-teal); font-weight: 600; text-align: right; }
+  td.neg  { color: var(--accent-red); font-weight: 600; text-align: right; }
+  td.pos  { color: var(--accent-green); font-weight: 600; text-align: right; }
+  td.right { text-align: right; }
+
+  /* Fire year row highlight */
+  tbody tr.fire-row { background: rgba(56,139,253,0.08) !important; }
+  tbody tr.fire-row td:first-child { color: var(--accent-blue); }
+  tbody tr.pension-row { background: rgba(46,160,67,0.06) !important; }
+
+  .school-badge {
+    display: inline-block; padding: 2px 6px; border-radius: 3px;
+    font-size: 10px; font-weight: 600;
+    background: rgba(163,113,247,0.15); color: var(--accent-purple); letter-spacing: 0.3px;
+  }
+  .no-children { text-align: center; padding: 24px; color: var(--text-muted); font-size: 13px; }
+
+  /* Asset table stripe */
+  .asset-table-wrap { max-height: 400px; overflow-y: auto; }
+  .asset-table-wrap::-webkit-scrollbar { width: 4px; }
+  .asset-table-wrap::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 2px; }
+  .asset-table-wrap thead th { position: sticky; top: 0; z-index: 1; }
+
+  /* ── Radio group ── */
+  .radio-group { display: flex; flex-direction: column; gap: 5px; margin-top: 4px; }
+  .radio-item {
+    display: flex; align-items: center; gap: 7px; cursor: pointer;
+    font-size: 12px; color: var(--text-secondary); padding: 5px 8px;
+    border-radius: var(--radius-sm); border: 1px solid var(--border);
+    background: var(--bg-tertiary); transition: border-color 0.15s;
+  }
+  .radio-item:hover { border-color: var(--border-light); }
+  .radio-item input[type="radio"] { accent-color: var(--accent-blue); width: 13px; height: 13px; cursor: pointer; }
+  .radio-item.selected { border-color: rgba(56,139,253,0.5); background: rgba(56,139,253,0.08); color: var(--text-primary); }
+  tbody tr.fullfire-row { background: rgba(248,81,73,0.07) !important; }
+  tbody tr.fullfire-row td:first-child { color: var(--accent-red); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">🔥</div>
+  <h1>SideFIRE シミュレータ</h1>
+  <span class="subtitle">— 資産形成 &amp; 早期セミリタイア試算</span>
+</header>
+
+<div class="main-layout">
+  <!-- ==================== Sidebar ==================== -->
+  <aside class="sidebar">
+
+    <!-- 基本情報 -->
+    <div>
+      <div class="section-label">基本情報</div>
+      <div class="form-group">
+        <label>現在の年齢</label>
+        <div class="input-suffix">
+          <input type="number" id="currentAge" value="41" min="20" max="64">
+          <span class="suffix">歳</span>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>現在の資産</label>
+        <div class="input-suffix">
+          <input type="number" id="currentAssets" value="100" min="0">
+          <span class="suffix">万円</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 収支情報 -->
+    <div>
+      <div class="section-label">収支情報</div>
+      <div class="form-group">
+        <label>現在の年収</label>
+        <div class="input-suffix">
+          <input type="number" id="annualIncome" value="700" min="0">
+          <span class="suffix">万円</span>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>月の積み立て金額 <span style="color:var(--accent-blue);font-size:10px;">※FIRE前のみ元本に加算</span></label>
+        <div class="input-suffix">
+          <input type="number" id="monthlySavings" value="10" min="0">
+          <span class="suffix">万円/月</span>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>月の生活費</label>
+        <div class="input-suffix">
+          <input type="number" id="monthlyExpense" value="45" min="0">
+          <span class="suffix">万円</span>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>SideFIRE後の月収</label>
+        <div class="input-suffix">
+          <input type="number" id="sideIncome" value="20" min="0">
+          <span class="suffix">万円</span>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>年金月額（65歳〜）</label>
+        <div class="input-suffix">
+          <input type="number" id="pension" value="15" min="0">
+          <span class="suffix">万円</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 運用設定 -->
+    <div>
+      <div class="section-label">運用設定</div>
+      <div class="slider-group">
+        <div class="slider-label-row">
+          <label>SideFIREする年齢</label>
+          <span class="slider-value" id="fireAgeVal">50歳</span>
+        </div>
+        <input type="range" id="fireAge" min="31" max="65" value="50" step="1">
+      </div>
+      <div class="slider-group">
+        <div class="slider-label-row">
+          <label>完全FIREする年齢 <span style="font-size:10px;color:var(--text-muted)">副収入→0</span></label>
+          <span class="slider-value" id="fullFireAgeVal">65歳</span>
+        </div>
+        <input type="range" id="fullFireAge" min="31" max="80" value="65" step="1">
+      </div>
+      <div class="slider-group">
+        <div class="slider-label-row">
+          <label>年間利回り</label>
+          <span class="slider-value" id="returnRateVal">5.0%</span>
+        </div>
+        <input type="range" id="returnRate" min="0" max="150" value="50" step="1">
+      </div>
+      <div class="form-group">
+        <label>65歳以降の生活費</label>
+        <div class="radio-group" id="livingCostRatioGroup">
+          <label class="radio-item selected">
+            <input type="radio" name="livingCostRatio65" value="1.00" checked onchange="onRadioChange()"> 継続（100%）
+          </label>
+          <label class="radio-item">
+            <input type="radio" name="livingCostRatio65" value="0.83" onchange="onRadioChange()"> 普通（83%）
+          </label>
+          <label class="radio-item">
+            <input type="radio" name="livingCostRatio65" value="0.75" onchange="onRadioChange()"> 質素（75%）
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <!-- 子供情報 -->
+    <div>
+      <div class="children-header">
+        <div class="section-label" style="margin-bottom:0;border:none;padding:0">子供情報</div>
+        <button class="btn-add" onclick="addChild()">＋ 子供を追加</button>
+      </div>
+      <div id="children-container"></div>
+    </div>
+
+  </aside>
+
+  <!-- ==================== Content ==================== -->
+  <main class="content">
+
+    <!-- Result cards -->
+    <div class="cards-row">
+      <div class="result-card blue">
+        <div class="card-label"><span class="card-icon blue">🎯</span>SideFIRE目標（4%ルール）</div>
+        <div class="card-value blue" id="card-target4">― 万円</div>
+        <div class="card-sub" id="card-target4-sub">達成見込み計算中...</div>
+      </div>
+      <div class="result-card orange">
+        <div class="card-label"><span class="card-icon orange">⚡</span>SideFIRE目標（不足分）</div>
+        <div class="card-value orange" id="card-targetShort">― 万円</div>
+        <div class="card-sub" id="card-targetShort-sub">達成見込み計算中...</div>
+      </div>
+      <div class="result-card purple">
+        <div class="card-label"><span class="card-icon purple">🎓</span>教育費総額</div>
+        <div class="card-value purple" id="card-edu">― 万円</div>
+        <div class="card-sub" id="card-edu-sub">全子供の合計</div>
+      </div>
+      <div class="result-card green">
+        <div class="card-label"><span class="card-icon green">💰</span>90歳時点の資産</div>
+        <div class="card-value green" id="card-final">― 万円</div>
+        <div class="card-sub" id="card-final-sub">シミュレーション最終値</div>
+      </div>
+    </div>
+
+    <!-- Banner -->
+    <div class="banner" id="banner"></div>
+
+    <!-- Chart -->
+    <div class="chart-panel">
+      <div class="chart-panel-header">
+        <div class="chart-title">資産推移シミュレーション</div>
+        <div class="chart-legend">
+          <div class="legend-item"><div class="legend-dot" style="background:#388bfd"></div><span>累積元本</span></div>
+          <div class="legend-item"><div class="legend-dot" style="background:#2dd4bf"></div><span>運用益</span></div>
+          <div class="legend-item"><div class="legend-line" style="border-color:#f85149"></div><span>4%ルール目標</span></div>
+          <div class="legend-item"><div class="legend-line" style="border-color:#d29922"></div><span>不足分目標</span></div>
+          <div class="legend-item"><div class="legend-line" style="border-color:#388bfd;border-style:solid"></div><span>FIRE年齢</span></div>
+          <div class="legend-item"><div class="legend-line" style="border-color:#f85149;border-style:solid"></div><span>完全FIRE年齢</span></div>
+          <div class="legend-item"><div class="legend-dot" style="background:rgba(163,113,247,0.3);border:1px solid rgba(163,113,247,0.5);width:14px;height:10px;border-radius:2px"></div><span>大学期間</span></div>
+        </div>
+      </div>
+      <div class="chart-container">
+        <canvas id="assetChart"></canvas>
+      </div>
+    </div>
+
+    <!-- Education table -->
+    <div class="table-panel">
+      <div class="table-title">教育費内訳</div>
+      <div id="edu-table-container">
+        <div class="no-children">子供情報を追加すると内訳が表示されます</div>
+      </div>
+    </div>
+
+    <!-- Asset timeline table -->
+    <div class="table-panel">
+      <div class="table-title">資産推移明細</div>
+      <div class="asset-table-wrap">
+        <div class="table-scroll">
+          <div id="asset-table-container"></div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+// ============================================================
+//  定数・デフォルト
+// ============================================================
+const EDU_DEFAULTS = {
+  elementary: { public: 35,  private: 167 },
+  middle:     { public: 54,  private: 144 },
+  high:       { public: 51,  private: 105 },
+  univ:       { national: 61, private_lib: 120, private_sci: 138 }
+};
+
+let children = [];
+let childIdCounter = 0;
+let chart = null;
+const STORAGE_KEY = 'sidefire_v2';
+
+// ============================================================
+//  入力ヘルパー（0を正しく読む）
+// ============================================================
+function getNum(id, defaultVal) {
+  const el = document.getElementById(id);
+  if (!el) return defaultVal;
+  const v = el.value;
+  return (v === '' || v === null) ? defaultVal : +v;
+}
+
+// ============================================================
+//  localStorage
+// ============================================================
+function saveToStorage() {
+  try {
+    const data = {
+      currentAge:     document.getElementById('currentAge').value,
+      currentAssets:  document.getElementById('currentAssets').value,
+      annualIncome:   document.getElementById('annualIncome').value,
+      monthlySavings: document.getElementById('monthlySavings').value,
+      monthlyExpense: document.getElementById('monthlyExpense').value,
+      sideIncome:     document.getElementById('sideIncome').value,
+      pension:        document.getElementById('pension').value,
+      fireAge:        document.getElementById('fireAge').value,
+      returnRate:     document.getElementById('returnRate').value,
+      fullFireAge:    document.getElementById('fullFireAge').value,
+      livingCostRatio65: document.querySelector('input[name="livingCostRatio65"]:checked')?.value || '1.00',
+      children:       children
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  } catch(e) {}
+}
+
+function loadFromStorage() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return false;
+    const d = JSON.parse(raw);
+    const setVal = (id, v) => { if (v !== undefined && v !== null && v !== '') document.getElementById(id).value = v; };
+    setVal('currentAge',     d.currentAge);
+    setVal('currentAssets',  d.currentAssets);
+    setVal('annualIncome',   d.annualIncome);
+    setVal('monthlySavings', d.monthlySavings);
+    setVal('monthlyExpense', d.monthlyExpense);
+    setVal('sideIncome',     d.sideIncome);
+    setVal('pension',        d.pension);
+    if (d.fireAge) {
+      document.getElementById('fireAge').value = d.fireAge;
+      document.getElementById('fireAgeVal').textContent = `${d.fireAge}歳`;
+    }
+    if (d.returnRate !== undefined) {
+      document.getElementById('returnRate').value = d.returnRate;
+      document.getElementById('returnRateVal').textContent = `${(d.returnRate / 10).toFixed(1)}%`;
+    }
+    if (d.fullFireAge) {
+      document.getElementById('fullFireAge').value = d.fullFireAge;
+      document.getElementById('fullFireAgeVal').textContent = `${d.fullFireAge}歳`;
+    }
+    if (d.livingCostRatio65) {
+      const radios = document.querySelectorAll('input[name="livingCostRatio65"]');
+      radios.forEach(r => {
+        r.checked = (r.value === d.livingCostRatio65);
+        r.closest('.radio-item').classList.toggle('selected', r.checked);
+      });
+    }
+    if (Array.isArray(d.children) && d.children.length > 0) {
+      children = d.children;
+      childIdCounter = Math.max(0, ...children.map(c => c.id));
+      renderChildren();
+      return true;
+    }
+    return false;
+  } catch(e) { return false; }
+}
+
+// ============================================================
+//  スライダー min 同期
+// ============================================================
+function syncFireSliderMin() {
+  const currentAge = getNum('currentAge', 41);
+  const slider = document.getElementById('fireAge');
+  const minAge = Math.max(currentAge + 1, 31);
+  slider.min = minAge;
+  if (+slider.value < minAge) {
+    slider.value = minAge;
+    document.getElementById('fireAgeVal').textContent = `${minAge}歳`;
+  }
+  // 完全FIRE年齢は SideFIRE年齢以上に
+  const fullSlider = document.getElementById('fullFireAge');
+  const fullMin = Math.max(+slider.value, minAge);
+  fullSlider.min = fullMin;
+  if (+fullSlider.value < fullMin) {
+    fullSlider.value = fullMin;
+    document.getElementById('fullFireAgeVal').textContent = `${fullMin}歳`;
+  }
+}
+
+// ============================================================
+//  子供 CRUD
+// ============================================================
+function addChild(preset = null) {
+  const id = ++childIdCounter;
+  const child = preset
+    ? { ...preset, id }
+    : {
+        id, age: 10,
+        elementary: 'public', middle: 'public', high: 'public', univ: 'national',
+        customEnabled: false,
+        custom: { elementary: 35, middle: 54, high: 51, univ: 61 }
+      };
+  child.id = id;
+  children.push(child);
+  renderChildren();
+  simulate();
+}
+
+function removeChild(id) {
+  children = children.filter(c => c.id !== id);
+  renderChildren();
+  simulate();
+}
+
+function renderChildren() {
+  const container = document.getElementById('children-container');
+  container.innerHTML = '';
+  children.forEach((child, idx) => {
+    const div = document.createElement('div');
+    div.className = 'child-card';
+    div.innerHTML = `
+      <div class="child-card-header">
+        <div class="child-card-title">子供 ${idx + 1}</div>
+        <button class="btn-remove" onclick="removeChild(${child.id})">×</button>
+      </div>
+      <div class="child-grid">
+        <div class="form-group full-width">
+          <label>現在の年齢</label>
+          <div class="input-suffix">
+            <input type="number" value="${child.age}" min="0" max="18"
+              oninput="updateChild(${child.id},'age',+this.value)">
+            <span class="suffix">歳</span>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>小学校</label>
+          <select onchange="updateChildSelect(${child.id},'elementary',this.value)">
+            <option value="public"  ${child.elementary==='public'?'selected':''}>公立</option>
+            <option value="private" ${child.elementary==='private'?'selected':''}>私立</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>中学校</label>
+          <select onchange="updateChildSelect(${child.id},'middle',this.value)">
+            <option value="public"  ${child.middle==='public'?'selected':''}>公立</option>
+            <option value="private" ${child.middle==='private'?'selected':''}>私立</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>高校</label>
+          <select onchange="updateChildSelect(${child.id},'high',this.value)">
+            <option value="public"  ${child.high==='public'?'selected':''}>公立</option>
+            <option value="private" ${child.high==='private'?'selected':''}>私立</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>大学</label>
+          <select onchange="updateChildSelect(${child.id},'univ',this.value)">
+            <option value="national"    ${child.univ==='national'?'selected':''}>国立</option>
+            <option value="private_lib" ${child.univ==='private_lib'?'selected':''}>私立文系</option>
+            <option value="private_sci" ${child.univ==='private_sci'?'selected':''}>私立理系</option>
+          </select>
+        </div>
+      </div>
+      <div class="custom-fee-toggle" onclick="toggleCustomFee(${child.id})">
+        <div class="toggle-indicator ${child.customEnabled ? 'on' : ''}"></div>
+        <span class="toggle-text">学費カスタム設定</span>
+      </div>
+      <div class="custom-fee-panel ${child.customEnabled ? 'open' : ''}">
+        <div class="form-group">
+          <label>小学校（万円/年）</label>
+          <input type="number" value="${child.custom.elementary}" min="0"
+            oninput="updateChildCustom(${child.id},'elementary',+this.value)">
+        </div>
+        <div class="form-group">
+          <label>中学校（万円/年）</label>
+          <input type="number" value="${child.custom.middle}" min="0"
+            oninput="updateChildCustom(${child.id},'middle',+this.value)">
+        </div>
+        <div class="form-group">
+          <label>高校（万円/年）</label>
+          <input type="number" value="${child.custom.high}" min="0"
+            oninput="updateChildCustom(${child.id},'high',+this.value)">
+        </div>
+        <div class="form-group">
+          <label>大学（万円/年）</label>
+          <input type="number" value="${child.custom.univ}" min="0"
+            oninput="updateChildCustom(${child.id},'univ',+this.value)">
+        </div>
+      </div>
+    `;
+    container.appendChild(div);
+  });
+  saveToStorage();
+}
+
+function updateChild(id, field, val) {
+  const c = children.find(c => c.id === id);
+  if (c) { c[field] = val; simulate(); }
+}
+function updateChildSelect(id, field, val) {
+  const c = children.find(c => c.id === id);
+  if (!c) return;
+  c[field] = val;
+  if (!c.customEnabled) {
+    c.custom[field === 'univ' ? 'univ' : field] =
+      field === 'univ' ? EDU_DEFAULTS.univ[val] : EDU_DEFAULTS[field][val];
+  }
+  simulate();
+}
+function updateChildCustom(id, field, val) {
+  const c = children.find(c => c.id === id);
+  if (c) { c.custom[field] = val; simulate(); }
+}
+function toggleCustomFee(id) {
+  const c = children.find(c => c.id === id);
+  if (!c) return;
+  c.customEnabled = !c.customEnabled;
+  if (!c.customEnabled) {
+    c.custom.elementary = EDU_DEFAULTS.elementary[c.elementary];
+    c.custom.middle     = EDU_DEFAULTS.middle[c.middle];
+    c.custom.high       = EDU_DEFAULTS.high[c.high];
+    c.custom.univ       = EDU_DEFAULTS.univ[c.univ];
+  }
+  renderChildren();
+  simulate();
+}
+
+// ============================================================
+//  教育費
+// ============================================================
+function getChildEduCostAtAge(child, a) {
+  if (a < 0 || a > 21) return 0;
+  if (a >= 6  && a <= 11) return child.customEnabled ? child.custom.elementary : EDU_DEFAULTS.elementary[child.elementary];
+  if (a >= 12 && a <= 14) return child.customEnabled ? child.custom.middle     : EDU_DEFAULTS.middle[child.middle];
+  if (a >= 15 && a <= 17) return child.customEnabled ? child.custom.high       : EDU_DEFAULTS.high[child.high];
+  if (a >= 18 && a <= 21) return child.customEnabled ? child.custom.univ       : EDU_DEFAULTS.univ[child.univ];
+  return 0;
+}
+function getTotalEduCostForChild(child) {
+  let total = 0;
+  for (let a = child.age; a <= 21; a++) total += getChildEduCostAtAge(child, a);
+  return total;
+}
+function getEduCostForYear(year, currentAge) {
+  let total = 0;
+  const offset = year - currentAge;
+  children.forEach(child => {
+    total += getChildEduCostAtAge(child, child.age + offset);
+  });
+  return total;
+}
+
+// ============================================================
+//  シミュレーション本体
+// ============================================================
+function simulate() {
+  const currentAge     = getNum('currentAge',     41);
+  const currentAssets  = getNum('currentAssets',  100);
+  const annualIncome   = getNum('annualIncome',    700);
+  const monthlySavings = getNum('monthlySavings',  10);
+  const monthlyExpense = getNum('monthlyExpense',  45);
+  const sideIncomeM    = getNum('sideIncome',      0);
+  const pensionM       = getNum('pension',         15);
+  const fireAge        = getNum('fireAge',         50);
+  const fullFireAge    = getNum('fullFireAge',      65);
+  const returnRateRaw  = getNum('returnRate',      50);
+  const returnRate     = returnRateRaw / 10 / 100;
+  const livingCostRatio65 = parseFloat(
+    document.querySelector('input[name="livingCostRatio65"]:checked')?.value || '1.00'
+  );
+
+  const annualExpense    = monthlyExpense  * 12;
+  const annualSideIncome = sideIncomeM    * 12;
+  const annualPension    = pensionM       * 12;
+  const annualSavings    = monthlySavings * 12;
+
+  // 目標額（SideFIRE期間の不足分ベース）
+  const target4pct   = annualExpense * 25;
+  const shortfallAnn = Math.max(0, (monthlyExpense - sideIncomeM) * 12);
+  const targetShort  = shortfallAnn > 0 ? shortfallAnn * 25 : 0;
+
+  const endAge = 90;
+  const ages = [];
+  const principalData = [];
+  const gainData      = [];
+  const tableRows     = [];
+
+  let asset               = currentAssets;
+  let cumulativePrincipal = currentAssets;
+  let achieve4Age     = null;
+  let achieveShortAge = null;
+
+  for (let age = currentAge; age <= endAge; age++) {
+    ages.push(age);
+    const eduCost = getEduCostForYear(age, currentAge);
+
+    // 65歳以降は生活費割合を適用
+    const effectiveExpense = age >= 65 ? annualExpense * livingCostRatio65 : annualExpense;
+    // 完全FIRE年齢以降は副収入=0
+    const effectiveSideIncome = age < fullFireAge ? annualSideIncome : 0;
+
+    let annualCashflow;
+    let principalAddition = 0;
+
+    if (age < fireAge) {
+      // ── FIRE前：フルタイム収入 ──
+      annualCashflow    = annualIncome - effectiveExpense - eduCost;
+      principalAddition = annualSavings;
+
+    } else if (age < 65) {
+      // ── SideFIRE期間（〜65歳未満）──
+      annualCashflow    = effectiveSideIncome - effectiveExpense - eduCost;
+      principalAddition = 0;
+
+    } else {
+      // ── 65歳以降：年金開始 ──
+      const livingCost    = effectiveExpense + eduCost;
+      const deficit       = Math.max(0, livingCost - effectiveSideIncome);
+      const pensionSurplus = Math.max(0, annualPension - deficit);
+
+      annualCashflow    = effectiveSideIncome + annualPension - livingCost;
+      principalAddition = pensionSurplus;
+    }
+
+    // 資産更新（年複利）
+    asset = asset * (1 + returnRate) + annualCashflow;
+    if (asset < 0) asset = 0;
+
+    // 元本更新
+    cumulativePrincipal += principalAddition;
+    // asset が cumulativePrincipal を下回ったらクリップ。
+    // こうすることで、その後 asset が回復した際に
+    // 回復分が「運用益（水色）」として表示される。
+    cumulativePrincipal = Math.min(cumulativePrincipal, asset);
+
+    const principal = cumulativePrincipal;          // = min(asset, cumulativePrincipal)
+    const gain      = Math.max(0, asset - cumulativePrincipal);
+
+    principalData.push(Math.round(principal));
+    gainData.push(Math.round(gain));
+
+    if (achieve4Age     === null && asset >= target4pct)                      achieve4Age     = age;
+    if (achieveShortAge === null && targetShort > 0 && asset >= targetShort)  achieveShortAge = age;
+
+    // 明細テーブル用
+    const income = age < fireAge ? annualIncome : effectiveSideIncome;
+    tableRows.push({
+      age,
+      asset:      Math.round(asset),
+      income:     Math.round(income),
+      expense:    Math.round(effectiveExpense),
+      eduCost:    Math.round(eduCost),
+      pension:    age >= 65 ? Math.round(annualPension) : 0,
+      savings:    age < fireAge ? Math.round(annualSavings) : 0,
+      cashflow:   Math.round(annualCashflow),
+      isFire:     age === fireAge,
+      isFullFire: age === fullFireAge && fullFireAge !== fireAge,
+      isPension:  age === 65
+    });
+  }
+
+  const totalEdu   = children.reduce((s, c) => s + getTotalEduCostForChild(c), 0);
+  const finalAsset = principalData.at(-1) + gainData.at(-1);
+
+  // カード更新
+  document.getElementById('card-target4').textContent = formatMan(target4pct);
+  document.getElementById('card-target4-sub').textContent =
+    achieve4Age ? `${achieve4Age}歳で達成見込み` : '90歳までに未達成';
+
+  document.getElementById('card-targetShort').textContent = formatMan(targetShort);
+  document.getElementById('card-targetShort-sub').textContent =
+    targetShort === 0 ? '収入でカバー済み' :
+    (achieveShortAge ? `${achieveShortAge}歳で達成見込み` : '90歳までに未達成');
+
+  document.getElementById('card-edu').textContent = formatMan(totalEdu);
+  document.getElementById('card-final').textContent = formatMan(finalAsset);
+  document.getElementById('card-final-sub').textContent = '90歳時点';
+
+  // バナー
+  const banner = document.getElementById('banner');
+  const shortAchievedBefore = achieveShortAge !== null && achieveShortAge <= fireAge;
+  const fullAchievedBefore  = achieve4Age     !== null && achieve4Age     <= fireAge;
+  if (targetShort === 0) {
+    banner.className = 'banner show success';
+    banner.textContent = '🎉 SideFIRE後の収入が生活費を上回っています！資産取り崩し不要';
+  } else if (fullAchievedBefore) {
+    banner.className = 'banner show info';
+    banner.textContent = `✅ 完全FIRE達成可能！ ${achieve4Age}歳で4%ルール目標に到達見込み`;
+  } else if (shortAchievedBefore) {
+    banner.className = 'banner show success';
+    banner.textContent = `🎉 SideFIRE達成可能！ ${achieveShortAge}歳で不足分目標に到達見込み`;
+  } else {
+    banner.className = 'banner show warning';
+    banner.textContent = '⚠️ 現在の設定では目標達成が難しい可能性があります';
+  }
+
+  updateChart(ages, principalData, gainData, target4pct, targetShort, fireAge, fullFireAge, currentAge);
+  updateEduTable(currentAge);
+  updateAssetTable(tableRows, fireAge, fullFireAge);
+  saveToStorage();
+}
+
+// ============================================================
+//  グラフ
+// ============================================================
+function buildAnnotations(ages, target4pct, targetShort, fireAge, fullFireAge, currentAge) {
+  const ann = {};
+
+  // 4%ルール目標ライン
+  ann.target4Line = {
+    type: 'line', yMin: target4pct, yMax: target4pct,
+    borderColor: 'rgba(248,81,73,0.8)', borderWidth: 2, borderDash: [6,4],
+    label: {
+      display: true, content: `4%目標: ${formatMan(target4pct)}`,
+      position: 'end', backgroundColor: 'rgba(248,81,73,0.18)',
+      color: '#ff9492', font: { size: 10 }, padding: { x:6, y:3 }, borderRadius: 4
+    }
+  };
+
+  // 不足分目標ライン
+  if (targetShort > 0 && Math.abs(targetShort - target4pct) > 100) {
+    ann.targetShortLine = {
+      type: 'line', yMin: targetShort, yMax: targetShort,
+      borderColor: 'rgba(210,153,34,0.8)', borderWidth: 2, borderDash: [6,4],
+      label: {
+        display: true, content: `不足分目標: ${formatMan(targetShort)}`,
+        position: 'start', backgroundColor: 'rgba(210,153,34,0.18)',
+        color: '#e3b341', font: { size: 10 }, padding: { x:6, y:3 }, borderRadius: 4
+      }
+    };
+  }
+
+  // SideFIRE年齢縦線（青）
+  const fireAgeIdx = ages.indexOf(fireAge);
+  if (fireAgeIdx >= 0) {
+    ann.fireAgeLine = {
+      type: 'line', xMin: fireAgeIdx, xMax: fireAgeIdx,
+      borderColor: 'rgba(56,139,253,0.7)', borderWidth: 2, borderDash: [4,4],
+      label: {
+        display: true, content: `SideFIRE: ${fireAge}歳`,
+        position: 'start', backgroundColor: 'rgba(56,139,253,0.18)',
+        color: '#79c0ff', font: { size: 10 }, padding: { x:6, y:3 }, borderRadius: 4,
+        yAdjust: 20
+      }
+    };
+  }
+
+  // 完全FIRE年齢縦線（赤）
+  const fullFireAgeIdx = ages.indexOf(fullFireAge);
+  if (fullFireAgeIdx >= 0 && fullFireAge !== fireAge) {
+    ann.fullFireAgeLine = {
+      type: 'line', xMin: fullFireAgeIdx, xMax: fullFireAgeIdx,
+      borderColor: 'rgba(248,81,73,0.7)', borderWidth: 2, borderDash: [4,4],
+      label: {
+        display: true, content: `完全FIRE: ${fullFireAge}歳`,
+        position: 'start', backgroundColor: 'rgba(248,81,73,0.18)',
+        color: '#ff9492', font: { size: 10 }, padding: { x:6, y:3 }, borderRadius: 4,
+        yAdjust: 44
+      }
+    };
+  }
+
+  // 子供の大学期間ハイライト
+  const univColors = [
+    ['rgba(163,113,247,0.10)', 'rgba(163,113,247,0.45)', 'rgba(163,113,247,0.85)'],
+    ['rgba(45,212,191,0.10)',  'rgba(45,212,191,0.45)',  'rgba(45,212,191,0.85)'],
+    ['rgba(210,153,34,0.10)', 'rgba(210,153,34,0.45)',  'rgba(210,153,34,0.85)'],
+    ['rgba(248,81,73,0.10)',  'rgba(248,81,73,0.45)',   'rgba(248,81,73,0.85)'],
+  ];
+  children.forEach((child, idx) => {
+    const startChildAge = Math.max(child.age, 18);
+    if (startChildAge > 21) return;
+    const parentStart = currentAge + (startChildAge - child.age);
+    const parentEnd   = currentAge + (21 - child.age);
+    if (parentEnd < currentAge || parentStart > 90) return;
+    const xMinIdx = ages.indexOf(Math.max(currentAge, parentStart));
+    const xMaxIdx = ages.indexOf(Math.min(90, parentEnd));
+    if (xMinIdx < 0 || xMaxIdx < 0) return;
+    const [bg, border, lbl] = univColors[idx % univColors.length];
+    ann[`univ_child${idx}`] = {
+      type: 'box', xMin: xMinIdx, xMax: xMaxIdx,
+      backgroundColor: bg, borderColor: border, borderWidth: 1,
+      label: {
+        display: true, content: `子${idx+1}大学`,
+        position: { x: 'center', y: 'start' },
+        color: lbl, font: { size: 9, weight: 'bold' },
+        backgroundColor: 'transparent', padding: { y: 2 }
+      }
+    };
+  });
+
+  return ann;
+}
+
+function updateChart(ages, principalData, gainData, target4pct, targetShort, fireAge, fullFireAge, currentAge) {
+  const ctx = document.getElementById('assetChart').getContext('2d');
+  const annotations = buildAnnotations(ages, target4pct, targetShort, fireAge, fullFireAge, currentAge);
+
+  if (chart) {
+    chart.data.labels = ages;
+    chart.data.datasets[0].data = principalData;
+    chart.data.datasets[1].data = gainData;
+    chart.options.plugins.annotation.annotations = annotations;
+    chart.update('none');
+  } else {
+    chart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: ages,
+        datasets: [
+          { label: '累積元本', data: principalData,
+            backgroundColor: 'rgba(56,139,253,0.75)', borderWidth: 0, stack: 'assets' },
+          { label: '運用益',   data: gainData,
+            backgroundColor: 'rgba(45,212,191,0.70)', borderWidth: 0, stack: 'assets' }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false, animation: { duration: 0 },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            mode: 'index', intersect: false,
+            callbacks: {
+              title: items => `${items[0].label}歳`,
+              label: item => {
+                if (item.datasetIndex !== 1) return null;
+                const p = item.chart.data.datasets[0].data[item.dataIndex] || 0;
+                const g = item.raw || 0;
+                return [
+                  `  元本: ${formatMan(p)}`,
+                  `  運用益: ${formatMan(g)}`,
+                  `  合計: ${formatMan(p + g)}`
+                ];
+              },
+              filter: item => item.datasetIndex === 1
+            },
+            backgroundColor: 'rgba(22,27,34,0.95)',
+            borderColor: 'rgba(48,54,61,0.8)', borderWidth: 1,
+            titleColor: '#e6edf3', bodyColor: '#8b949e',
+            padding: 10, cornerRadius: 8
+          },
+          annotation: { annotations }
+        },
+        scales: {
+          x: {
+            stacked: true,
+            grid: { color: 'rgba(48,54,61,0.4)', drawTicks: false },
+            ticks: {
+              color: '#656d76', font: { size: 10 }, maxRotation: 0,
+              callback: function(val) {
+                const age = this.getLabelForValue(val);
+                return age % 5 === 0 ? `${age}歳` : '';
+              }
+            },
+            border: { color: 'rgba(48,54,61,0.6)' }
+          },
+          y: {
+            stacked: true,
+            grid: { color: 'rgba(48,54,61,0.4)' },
+            ticks: {
+              color: '#656d76', font: { size: 10 }, maxTicksLimit: 8,
+              callback: v => {
+                const abs = Math.abs(v);
+                if (abs === 0) return '0万';
+                if (abs >= 10000) {
+                  const oku = v / 10000;
+                  return (oku % 1 === 0 ? `${oku}億` : `${oku.toFixed(1)}億`);
+                }
+                if (abs >= 1000) return `${(v / 1000).toFixed(0)}千万`;
+                return `${v}万`;
+              }
+            },
+            border: { color: 'rgba(48,54,61,0.6)' }
+          }
+        },
+        barPercentage: 0.95, categoryPercentage: 0.98
+      }
+    });
+  }
+}
+
+// ============================================================
+//  教育費テーブル
+// ============================================================
+function updateEduTable(currentAge) {
+  const container = document.getElementById('edu-table-container');
+  if (children.length === 0) {
+    container.innerHTML = '<div class="no-children">子供情報を追加すると内訳が表示されます</div>';
+    return;
+  }
+  const rows = children.map((child, idx) => {
+    const total = getTotalEduCostForChild(child);
+    return `<tr>
+      <td>子供 ${idx+1}（現在${child.age}歳）</td>
+      <td><span class="school-badge">${buildPattern(child)}</span></td>
+      <td class="num">${formatMan(total)}</td>
+    </tr>`;
+  });
+  const grand = children.reduce((s, c) => s + getTotalEduCostForChild(c), 0);
+  container.innerHTML = `
+    <table>
+      <thead><tr><th>子供</th><th>学校パターン</th><th>残り教育費（推定）</th></tr></thead>
+      <tbody>
+        ${rows.join('')}
+        <tr style="background:rgba(255,255,255,0.03)">
+          <td style="color:var(--text-muted)">合計</td><td>—</td>
+          <td class="num" style="color:var(--accent-purple)">${formatMan(grand)}</td>
+        </tr>
+      </tbody>
+    </table>`;
+}
+
+function buildPattern(child) {
+  const e = child.elementary === 'public' ? '小公' : '小私';
+  const m = child.middle     === 'public' ? '中公' : '中私';
+  const h = child.high       === 'public' ? '高公' : '高私';
+  const u = child.univ === 'national' ? '大国' : child.univ === 'private_lib' ? '大私文' : '大私理';
+  return `${e}/${m}/${h}/${u}`;
+}
+
+// ============================================================
+//  資産推移テーブル
+// ============================================================
+function updateAssetTable(rows, fireAge, fullFireAge) {
+  const container = document.getElementById('asset-table-container');
+  const trs = rows.map(r => {
+    const cls = r.isFire ? 'fire-row' : r.isFullFire ? 'fullfire-row' : r.isPension ? 'pension-row' : '';
+    const cfCls = r.cashflow >= 0 ? 'pos right' : 'neg right';
+    return `<tr class="${cls}">
+      <td>${r.age}歳${r.isFire ? ' 🔥' : r.isFullFire ? ' ✅' : r.isPension ? ' 🎌' : ''}</td>
+      <td class="num">${r.asset.toLocaleString()}</td>
+      <td class="right">${r.income.toLocaleString()}</td>
+      <td class="right">${r.savings > 0 ? r.savings.toLocaleString() : '―'}</td>
+      <td class="right">${r.expense.toLocaleString()}</td>
+      <td class="right">${r.eduCost > 0 ? r.eduCost.toLocaleString() : '―'}</td>
+      <td class="right">${r.pension > 0 ? r.pension.toLocaleString() : '―'}</td>
+      <td class="${cfCls}">${r.cashflow >= 0 ? '+' : ''}${r.cashflow.toLocaleString()}</td>
+    </tr>`;
+  }).join('');
+  container.innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>年齢</th><th>総資産(万)</th><th>収入(万)</th><th>積立(万)</th>
+          <th>生活費(万)</th><th>教育費(万)</th><th>年金(万)</th><th>年間収支(万)</th>
+        </tr>
+      </thead>
+      <tbody>${trs}</tbody>
+    </table>`;
+}
+
+// ============================================================
+//  フォーマット
+// ============================================================
+function formatMan(val) {
+  if (val === undefined || isNaN(val)) return '― 万円';
+  const v = Math.round(val);
+  const abs = Math.abs(v);
+  if (abs >= 10000) {
+    const oku = v / 10000;
+    return (oku % 1 === 0 ? `${oku}億円` : `${oku.toFixed(1)}億円`);
+  }
+  return `${v.toLocaleString()} 万円`;
+}
+
+// ============================================================
+//  イベント登録
+// ============================================================
+document.getElementById('fireAge').addEventListener('input', function() {
+  document.getElementById('fireAgeVal').textContent = `${this.value}歳`;
+  syncFireSliderMin();
+  simulate();
+});
+document.getElementById('fullFireAge').addEventListener('input', function() {
+  document.getElementById('fullFireAgeVal').textContent = `${this.value}歳`;
+  simulate();
+});
+document.getElementById('returnRate').addEventListener('input', function() {
+  document.getElementById('returnRateVal').textContent = `${(this.value / 10).toFixed(1)}%`;
+  simulate();
+});
+
+['currentAge','currentAssets','annualIncome','monthlySavings','monthlyExpense','sideIncome','pension']
+  .forEach(id => {
+    document.getElementById(id).addEventListener('input', () => {
+      if (id === 'currentAge') syncFireSliderMin();
+      simulate();
+    });
+  });
+
+function onRadioChange() {
+  document.querySelectorAll('.radio-item').forEach(el => {
+    el.classList.toggle('selected', el.querySelector('input[type="radio"]').checked);
+  });
+  simulate();
+}
+
+// ============================================================
+//  初期化
+// ============================================================
+(function init() {
+  syncFireSliderMin();
+
+  // localStorage から復元、なければデフォルト2名
+  const restored = loadFromStorage();
+  if (!restored) {
+    addChild({ age: 10, elementary: 'public', middle: 'public', high: 'public', univ: 'national',
+               customEnabled: false, custom: { elementary: 35, middle: 54, high: 51, univ: 61 } });
+    addChild({ age: 4,  elementary: 'public', middle: 'public', high: 'public', univ: 'national',
+               customEnabled: false, custom: { elementary: 35, middle: 54, high: 51, univ: 61 } });
+  } else {
+    simulate();
+  }
+})();
+</script>
+</body>
+</html>

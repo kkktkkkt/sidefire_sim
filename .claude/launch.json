@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "SideFIRE Simulator",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "3000", "--directory", "F:/prog/SideFire_Sim"],
+      "port": 3000
+    }
+  ]
+}
