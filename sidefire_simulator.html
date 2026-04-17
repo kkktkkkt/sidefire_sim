@@ -265,16 +265,15 @@
     border-radius: var(--radius); padding: 20px;
   }
   .table-title { font-size: 14px; font-weight: 600; margin-bottom: 14px; color: var(--text-primary); }
-  .table-scroll { overflow-x: auto; }
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
   thead th {
-    padding: 8px 12px; text-align: left;
+    padding: 8px 12px; text-align: right;
     font-size: 11px; font-weight: 600; color: var(--text-muted);
     letter-spacing: 0.5px; text-transform: uppercase;
     border-bottom: 1px solid var(--border); background: var(--bg-tertiary);
     white-space: nowrap;
   }
-  thead th:first-child { border-radius: var(--radius-sm) 0 0 0; }
+  thead th:first-child { border-radius: var(--radius-sm) 0 0 0; text-align: left; }
   thead th:last-child  { border-radius: 0 var(--radius-sm) 0 0; }
   tbody tr { border-bottom: 1px solid var(--border); transition: background 0.1s; }
   tbody tr:hover { background: rgba(255,255,255,0.03); }
@@ -298,11 +297,15 @@
   }
   .no-children { text-align: center; padding: 24px; color: var(--text-muted); font-size: 13px; }
 
-  /* Asset table stripe */
-  .asset-table-wrap { max-height: 400px; overflow-y: auto; }
-  .asset-table-wrap::-webkit-scrollbar { width: 4px; }
+  /* Asset table — single scroll container so position:sticky works */
+  .asset-table-wrap {
+    max-height: 600px;
+    overflow-y: auto;
+    overflow-x: auto;
+  }
+  .asset-table-wrap::-webkit-scrollbar { width: 4px; height: 4px; }
   .asset-table-wrap::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 2px; }
-  .asset-table-wrap thead th { position: sticky; top: 0; z-index: 1; }
+  .asset-table-wrap thead th { position: sticky; top: 0; z-index: 2; }
 
   /* ── Radio group ── */
   .radio-group { display: flex; flex-direction: column; gap: 5px; margin-top: 4px; }
@@ -354,11 +357,12 @@
     <div>
       <div class="section-label">収支情報</div>
       <div class="form-group">
-        <label>現在の年収</label>
+        <label>現在の年収（額面）</label>
         <div class="input-suffix">
           <input type="number" id="annualIncome" value="700" min="0">
           <span class="suffix">万円</span>
         </div>
+        <div id="afterTaxDisplay" style="font-size:11px;color:var(--accent-teal);margin-top:4px;padding-left:2px;"></div>
       </div>
       <div class="form-group">
         <label>月の積み立て金額 <span style="color:var(--accent-blue);font-size:10px;">※FIRE前のみ元本に加算</span></label>
@@ -415,6 +419,23 @@
         <input type="range" id="returnRate" min="0" max="150" value="50" step="1">
       </div>
       <div class="form-group">
+        <label>取り崩し時の税金（20%）</label>
+        <div style="display:flex;align-items:center;gap:10px;margin-top:4px;">
+          <div id="withdrawalTaxToggle" onclick="toggleWithdrawalTax()"
+               style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;">
+            <div id="withdrawalTaxIndicator" style="
+              width:36px;height:20px;border-radius:10px;background:var(--bg-tertiary);
+              border:1px solid var(--border-light);position:relative;transition:background 0.2s;">
+              <div id="withdrawalTaxThumb" style="
+                position:absolute;top:2px;left:2px;width:14px;height:14px;
+                border-radius:50%;background:var(--text-muted);transition:all 0.2s;"></div>
+            </div>
+            <span id="withdrawalTaxLabel" style="font-size:12px;color:var(--text-secondary);">OFF（税なし）</span>
+          </div>
+        </div>
+        <div style="font-size:10px;color:var(--text-muted);margin-top:4px;">ONで取り崩し額を1.25倍（税20%を考慮）</div>
+      </div>
+      <div class="form-group">
         <label>65歳以降の生活費</label>
         <div class="radio-group" id="livingCostRatioGroup">
           <label class="radio-item selected">
@@ -447,7 +468,7 @@
     <!-- Result cards -->
     <div class="cards-row">
       <div class="result-card blue">
-        <div class="card-label"><span class="card-icon blue">🎯</span>SideFIRE目標（4%ルール）</div>
+        <div class="card-label"><span class="card-icon blue">🎯</span>完全FIRE目標（4%ルール）</div>
         <div class="card-value blue" id="card-target4">― 万円</div>
         <div class="card-sub" id="card-target4-sub">達成見込み計算中...</div>
       </div>
@@ -501,11 +522,7 @@
     <!-- Asset timeline table -->
     <div class="table-panel">
       <div class="table-title">資産推移明細</div>
-      <div class="asset-table-wrap">
-        <div class="table-scroll">
-          <div id="asset-table-container"></div>
-        </div>
-      </div>
+      <div class="asset-table-wrap" id="asset-table-container"></div>
     </div>
 
   </main>
@@ -554,6 +571,7 @@ function saveToStorage() {
       returnRate:     document.getElementById('returnRate').value,
       fullFireAge:    document.getElementById('fullFireAge').value,
       livingCostRatio65: document.querySelector('input[name="livingCostRatio65"]:checked')?.value || '1.00',
+      withdrawalTaxEnabled: withdrawalTaxEnabled,
       children:       children
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -591,6 +609,10 @@ function loadFromStorage() {
         r.checked = (r.value === d.livingCostRatio65);
         r.closest('.radio-item').classList.toggle('selected', r.checked);
       });
+    }
+    if (d.withdrawalTaxEnabled) {
+      withdrawalTaxEnabled = false; // force off before toggle so it flips to saved state
+      toggleWithdrawalTax();
     }
     if (Array.isArray(d.children) && d.children.length > 0) {
       children = d.children;
@@ -789,6 +811,71 @@ function getEduCostForYear(year, currentAge) {
 }
 
 // ============================================================
+//  税金計算
+// ============================================================
+let withdrawalTaxEnabled = false;
+
+function toggleWithdrawalTax() {
+  withdrawalTaxEnabled = !withdrawalTaxEnabled;
+  const indicator = document.getElementById('withdrawalTaxIndicator');
+  const thumb     = document.getElementById('withdrawalTaxThumb');
+  const label     = document.getElementById('withdrawalTaxLabel');
+  if (withdrawalTaxEnabled) {
+    indicator.style.background = 'var(--accent-blue)';
+    thumb.style.left = '18px';
+    thumb.style.background = '#fff';
+    label.textContent = 'ON（20%課税）';
+    label.style.color = 'var(--accent-blue)';
+  } else {
+    indicator.style.background = 'var(--bg-tertiary)';
+    thumb.style.left = '2px';
+    thumb.style.background = 'var(--text-muted)';
+    label.textContent = 'OFF（税なし）';
+    label.style.color = 'var(--text-secondary)';
+  }
+  simulate();
+}
+
+// 日本の給与所得税（概算）: 給与所得控除 → 課税所得 → 所得税(累進) + 住民税(10%) + 社会保険料(~14.5%)
+function calcAfterTaxIncome(grossMan) {
+  const gross = grossMan * 10000; // 円換算
+
+  // 給与所得控除（2020年〜）
+  let deduction;
+  if      (gross <= 1_625_000)  deduction = 550_000;
+  else if (gross <= 1_800_000)  deduction = gross * 0.4 - 100_000;
+  else if (gross <= 3_600_000)  deduction = gross * 0.3 + 80_000;
+  else if (gross <= 6_600_000)  deduction = gross * 0.2 + 440_000;
+  else if (gross <= 8_500_000)  deduction = gross * 0.1 + 1_100_000;
+  else                          deduction = 1_950_000;
+
+  // 基礎控除（2020年〜）
+  const basicDeduction = gross <= 24_000_000 ? 480_000 : 0;
+
+  const taxableIncome = Math.max(0, gross - deduction - basicDeduction);
+
+  // 所得税（累進）
+  let incomeTax;
+  if      (taxableIncome <= 1_950_000)  incomeTax = taxableIncome * 0.05;
+  else if (taxableIncome <= 3_300_000)  incomeTax = taxableIncome * 0.10 - 97_500;
+  else if (taxableIncome <= 6_950_000)  incomeTax = taxableIncome * 0.20 - 427_500;
+  else if (taxableIncome <= 9_000_000)  incomeTax = taxableIncome * 0.23 - 636_000;
+  else if (taxableIncome <= 18_000_000) incomeTax = taxableIncome * 0.33 - 1_536_000;
+  else if (taxableIncome <= 40_000_000) incomeTax = taxableIncome * 0.40 - 2_796_000;
+  else                                  incomeTax = taxableIncome * 0.45 - 4_796_000;
+  incomeTax *= 1.021; // 復興特別所得税
+
+  // 住民税（課税所得の10%）
+  const municipalTax = taxableIncome * 0.10;
+
+  // 社会保険料（概算: 健保+厚年+雇用 ≒ 14.5%）
+  const socialInsurance = gross * 0.145;
+
+  const netYen = gross - incomeTax - municipalTax - socialInsurance;
+  return Math.round(netYen / 10000); // 万円
+}
+
+// ============================================================
 //  シミュレーション本体
 // ============================================================
 function simulate() {
@@ -806,6 +893,14 @@ function simulate() {
   const livingCostRatio65 = parseFloat(
     document.querySelector('input[name="livingCostRatio65"]:checked')?.value || '1.00'
   );
+
+  // 手取り計算・表示
+  const afterTaxIncome = calcAfterTaxIncome(annualIncome);
+  const afterTaxDisplay = document.getElementById('afterTaxDisplay');
+  if (afterTaxDisplay) {
+    const rate = annualIncome > 0 ? Math.round((1 - afterTaxIncome / annualIncome) * 100) : 0;
+    afterTaxDisplay.textContent = `手取り推定: 約 ${afterTaxIncome.toLocaleString()} 万円（控除率 ${rate}%）`;
+  }
 
   const annualExpense    = monthlyExpense  * 12;
   const annualSideIncome = sideIncomeM    * 12;
@@ -841,8 +936,9 @@ function simulate() {
     let principalAddition = 0;
 
     if (age < fireAge) {
-      // ── FIRE前：フルタイム収入 ──
-      annualCashflow    = annualIncome - effectiveExpense - eduCost;
+      // ── FIRE前：毎月の積み立て額が資産に積み上がる ──
+      // （収入・生活費は表示用。実際の投資額 = annualSavings）
+      annualCashflow    = annualSavings - eduCost; // 積み立て − 教育費が純増減
       principalAddition = annualSavings;
 
     } else if (age < 65) {
@@ -860,9 +956,18 @@ function simulate() {
       principalAddition = pensionSurplus;
     }
 
+    // 取り崩し税（20%）: キャッシュフローが負の場合、実際にはより多く売却が必要
+    let effectiveCashflow = annualCashflow;
+    if (withdrawalTaxEnabled && annualCashflow < 0) {
+      effectiveCashflow = annualCashflow / 0.8; // 税引き後で必要額を確保するには1.25倍売却
+    }
+
     // 資産更新（年複利）
-    asset = asset * (1 + returnRate) + annualCashflow;
+    const prevAsset = asset;
+    const investmentReturn = Math.round(prevAsset * returnRate);  // 今年の利回り益
+    asset = asset * (1 + returnRate) + effectiveCashflow;
     if (asset < 0) asset = 0;
+    const assetChange = Math.round(asset - prevAsset);  // 前年比（利回り＋収支）
 
     // 元本更新
     cumulativePrincipal += principalAddition;
@@ -880,17 +985,19 @@ function simulate() {
     if (achieve4Age     === null && asset >= target4pct)                      achieve4Age     = age;
     if (achieveShortAge === null && targetShort > 0 && asset >= targetShort)  achieveShortAge = age;
 
-    // 明細テーブル用
-    const income = age < fireAge ? annualIncome : effectiveSideIncome;
+    // 明細テーブル用（収入は手取り表示）
+    const income = age < fireAge ? afterTaxIncome : effectiveSideIncome;
     tableRows.push({
       age,
-      asset:      Math.round(asset),
-      income:     Math.round(income),
-      expense:    Math.round(effectiveExpense),
-      eduCost:    Math.round(eduCost),
-      pension:    age >= 65 ? Math.round(annualPension) : 0,
-      savings:    age < fireAge ? Math.round(annualSavings) : 0,
-      cashflow:   Math.round(annualCashflow),
+      asset:            Math.round(asset),
+      income:           Math.round(income),
+      expense:          Math.round(effectiveExpense),
+      eduCost:          Math.round(eduCost),
+      pension:          age >= 65 ? Math.round(annualPension) : 0,
+      savings:          age < fireAge ? Math.round(annualSavings) : 0,
+      cashflow:         Math.round(effectiveCashflow),
+      investmentReturn,
+      assetChange,
       isFire:     age === fireAge,
       isFullFire: age === fullFireAge && fullFireAge !== fireAge,
       isPension:  age === 65
@@ -1161,26 +1268,44 @@ function buildPattern(child) {
 // ============================================================
 function updateAssetTable(rows, fireAge, fullFireAge) {
   const container = document.getElementById('asset-table-container');
+
+  const fmtNum  = v => v.toLocaleString();
+  const fmtSign = v => (v >= 0 ? '+' : '') + v.toLocaleString();
+  const dash    = v => (v > 0 ? fmtNum(v) : '―');
+
   const trs = rows.map(r => {
-    const cls = r.isFire ? 'fire-row' : r.isFullFire ? 'fullfire-row' : r.isPension ? 'pension-row' : '';
-    const cfCls = r.cashflow >= 0 ? 'pos right' : 'neg right';
+    const cls   = r.isFire ? 'fire-row' : r.isFullFire ? 'fullfire-row' : r.isPension ? 'pension-row' : '';
+    const cfCls = r.cashflow    >= 0 ? 'pos right' : 'neg right';
+    const acCls = r.assetChange >= 0 ? 'pos right' : 'neg right';
+    const label = r.isFire ? ' 🔥' : r.isFullFire ? ' ✅' : r.isPension ? ' 🎌' : '';
     return `<tr class="${cls}">
-      <td>${r.age}歳${r.isFire ? ' 🔥' : r.isFullFire ? ' ✅' : r.isPension ? ' 🎌' : ''}</td>
-      <td class="num">${r.asset.toLocaleString()}</td>
-      <td class="right">${r.income.toLocaleString()}</td>
-      <td class="right">${r.savings > 0 ? r.savings.toLocaleString() : '―'}</td>
-      <td class="right">${r.expense.toLocaleString()}</td>
-      <td class="right">${r.eduCost > 0 ? r.eduCost.toLocaleString() : '―'}</td>
-      <td class="right">${r.pension > 0 ? r.pension.toLocaleString() : '―'}</td>
-      <td class="${cfCls}">${r.cashflow >= 0 ? '+' : ''}${r.cashflow.toLocaleString()}</td>
+      <td>${r.age}歳${label}</td>
+      <td class="num">${fmtNum(r.asset)}</td>
+      <td class="right">${fmtNum(r.income)}</td>
+      <td class="right">${dash(r.savings)}</td>
+      <td class="right">${fmtNum(r.expense)}</td>
+      <td class="right">${dash(r.eduCost)}</td>
+      <td class="right">${dash(r.pension)}</td>
+      <td class="${cfCls}">${fmtSign(r.cashflow)}</td>
+      <td class="right" style="color:var(--accent-teal)">${fmtNum(r.investmentReturn)}</td>
+      <td class="${acCls}">${fmtSign(r.assetChange)}</td>
     </tr>`;
   }).join('');
+
   container.innerHTML = `
     <table>
       <thead>
         <tr>
-          <th>年齢</th><th>総資産(万)</th><th>収入(万)</th><th>積立(万)</th>
-          <th>生活費(万)</th><th>教育費(万)</th><th>年金(万)</th><th>年間収支(万)</th>
+          <th style="text-align:left">年齢</th>
+          <th>総資産(万)</th>
+          <th title="手取り収入">収入†(万)</th>
+          <th>積立(万)</th>
+          <th>生活費(万)</th>
+          <th>教育費(万)</th>
+          <th>年金(万)</th>
+          <th title="FIRE前: 積立−教育費 / SideFIRE: 副収入−生活費−教育費 / 65歳〜: +年金">CF(万)</th>
+          <th>利回り益(万)</th>
+          <th>前年比(万)</th>
         </tr>
       </thead>
       <tbody>${trs}</tbody>
