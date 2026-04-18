@@ -365,7 +365,7 @@
         <div id="afterTaxDisplay" style="font-size:11px;color:var(--accent-teal);margin-top:4px;padding-left:2px;"></div>
       </div>
       <div class="form-group">
-        <label>月の積み立て金額 <span style="color:var(--accent-blue);font-size:10px;">※FIRE前のみ元本に加算</span></label>
+        <label>月の積み立て金額 <span style="color:var(--accent-blue);font-size:10px;">※SideFIRE/完全FIRE後は積立０</span></label>
         <div class="input-suffix">
           <input type="number" id="monthlySavings" value="10" min="0">
           <span class="suffix">万円/月</span>
@@ -436,6 +436,50 @@
         <div style="font-size:10px;color:var(--text-muted);margin-top:4px;">ONで取り崩し額を1.25倍（税20%を考慮）</div>
       </div>
       <div class="form-group">
+        <label>暴落シミュレーション <span style="font-size:10px;color:var(--accent-orange);">モンテカルロ</span></label>
+        <div style="display:flex;align-items:center;gap:10px;margin-top:4px;">
+          <div id="crashToggle" onclick="toggleCrash()"
+               style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;">
+            <div id="crashIndicator" style="
+              width:36px;height:20px;border-radius:10px;background:var(--bg-tertiary);
+              border:1px solid var(--border-light);position:relative;transition:background 0.2s;">
+              <div id="crashThumb" style="
+                position:absolute;top:2px;left:2px;width:14px;height:14px;
+                border-radius:50%;background:var(--text-muted);transition:all 0.2s;"></div>
+            </div>
+            <span id="crashLabel" style="font-size:12px;color:var(--text-secondary);">OFF</span>
+          </div>
+        </div>
+        <div id="crashSettings" style="display:none;margin-top:10px;">
+          <div class="slider-group" style="margin-bottom:4px;">
+            <div class="slider-label-row">
+              <label style="font-size:11px;">暴落確率/年</label>
+              <span class="slider-value" id="crashProbVal" style="font-size:11px;">10%</span>
+            </div>
+            <input type="range" id="crashProb" min="1" max="25" value="10" step="1"
+              oninput="document.getElementById('crashProbVal').textContent=this.value+'%'; updateCrashHint(); simulate();">
+            <div id="crashProbHint" style="font-size:10px;color:var(--accent-orange);margin-top:2px;">＝ 約10年に1回の頻度（歴史的平均に近い）</div>
+          </div>
+          <div class="slider-group" style="margin-bottom:4px;">
+            <div class="slider-label-row">
+              <label style="font-size:11px;">暴落時の下落幅</label>
+              <span class="slider-value" id="crashMagVal" style="font-size:11px;">40%</span>
+            </div>
+            <input type="range" id="crashMag" min="10" max="70" value="40" step="5"
+              oninput="document.getElementById('crashMagVal').textContent=this.value+'%'; simulate();">
+            <div style="font-size:10px;color:var(--text-muted);margin-top:2px;">参考: ITバブル崩壊-49%・リーマン-57%・コロナ-34%</div>
+          </div>
+          <div style="background:rgba(210,153,34,0.08);border:1px solid rgba(210,153,34,0.25);border-radius:6px;padding:8px;margin-top:8px;font-size:10px;line-height:1.7;color:var(--text-secondary);">
+            <div style="color:var(--accent-orange);font-weight:600;margin-bottom:4px;">📊 グラフの見方</div>
+            <div>棒グラフ ＝ <b>暴落なし</b>の基本シナリオ</div>
+            <div><span style="color:rgba(46,160,67,1);">━</span> 楽観(90%) ＝ 300回中<b>上位30位</b>の幸運ケース</div>
+            <div><span style="color:rgba(210,153,34,1);">╌</span> 中央値(50%) ＝ 300回の<b>平均的</b>な結果</div>
+            <div><span style="color:rgba(248,81,73,1);">━</span> 悲観(10%) ＝ 300回中<b>下位30位</b>の不運ケース</div>
+            <div style="margin-top:4px;color:var(--text-muted);">3本のラインすべて棒グラフより低い場合は<br>暴落により基本より悪化することを意味します</div>
+          </div>
+        </div>
+      </div>
+      <div class="form-group">
         <label>65歳以降の生活費</label>
         <div class="radio-group" id="livingCostRatioGroup">
           <label class="radio-item selected">
@@ -473,7 +517,7 @@
         <div class="card-sub" id="card-target4-sub">達成見込み計算中...</div>
       </div>
       <div class="result-card orange">
-        <div class="card-label"><span class="card-icon orange">⚡</span>SideFIRE目標（不足分）</div>
+        <div class="card-label"><span class="card-icon orange">⚡</span>SideFIRE目標（副収入で収支±0）</div>
         <div class="card-value orange" id="card-targetShort">― 万円</div>
         <div class="card-sub" id="card-targetShort-sub">達成見込み計算中...</div>
       </div>
@@ -500,10 +544,15 @@
           <div class="legend-item"><div class="legend-dot" style="background:#388bfd"></div><span>累積元本</span></div>
           <div class="legend-item"><div class="legend-dot" style="background:#2dd4bf"></div><span>運用益</span></div>
           <div class="legend-item"><div class="legend-line" style="border-color:#f85149"></div><span>4%ルール目標</span></div>
-          <div class="legend-item"><div class="legend-line" style="border-color:#d29922"></div><span>不足分目標</span></div>
+          <div class="legend-item"><div class="legend-line" style="border-color:#d29922"></div><span>副収入収支±0目標</span></div>
           <div class="legend-item"><div class="legend-line" style="border-color:#388bfd;border-style:solid"></div><span>FIRE年齢</span></div>
           <div class="legend-item"><div class="legend-line" style="border-color:#f85149;border-style:solid"></div><span>完全FIRE年齢</span></div>
           <div class="legend-item"><div class="legend-dot" style="background:rgba(163,113,247,0.3);border:1px solid rgba(163,113,247,0.5);width:14px;height:10px;border-radius:2px"></div><span>大学期間</span></div>
+          <div id="crashLegend" style="display:none;gap:8px;align-items:center;flex-wrap:wrap;">
+            <div class="legend-item"><div class="legend-line" style="border-color:#2ea043;border-style:solid"></div><span>楽観(90%)</span></div>
+            <div class="legend-item"><div class="legend-line" style="border-color:#d29922;border-style:solid"></div><span>中央値(50%)</span></div>
+            <div class="legend-item"><div class="legend-line" style="border-color:#f85149;border-style:solid"></div><span>悲観(10%)</span></div>
+          </div>
         </div>
       </div>
       <div class="chart-container">
@@ -572,6 +621,9 @@ function saveToStorage() {
       fullFireAge:    document.getElementById('fullFireAge').value,
       livingCostRatio65: document.querySelector('input[name="livingCostRatio65"]:checked')?.value || '1.00',
       withdrawalTaxEnabled: withdrawalTaxEnabled,
+      crashEnabled: crashEnabled,
+      crashProb:    document.getElementById('crashProb').value,
+      crashMag:     document.getElementById('crashMag').value,
       children:       children
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -611,8 +663,14 @@ function loadFromStorage() {
       });
     }
     if (d.withdrawalTaxEnabled) {
-      withdrawalTaxEnabled = false; // force off before toggle so it flips to saved state
+      withdrawalTaxEnabled = false;
       toggleWithdrawalTax();
+    }
+    if (d.crashEnabled) {
+      if (d.crashProb) { document.getElementById('crashProb').value = d.crashProb; document.getElementById('crashProbVal').textContent = d.crashProb + '%'; }
+      if (d.crashMag)  { document.getElementById('crashMag').value  = d.crashMag;  document.getElementById('crashMagVal').textContent  = d.crashMag  + '%'; }
+      crashEnabled = false;
+      toggleCrash();
     }
     if (Array.isArray(d.children) && d.children.length > 0) {
       children = d.children;
@@ -811,9 +869,105 @@ function getEduCostForYear(year, currentAge) {
 }
 
 // ============================================================
-//  税金計算
+//  税金計算・暴落シミュレーション グローバル
 // ============================================================
 let withdrawalTaxEnabled = false;
+let crashEnabled = false;
+
+function updateCrashHint() {
+  const prob = getNum('crashProb', 10);
+  const years = Math.round(1 / (prob / 100));
+  const hint = document.getElementById('crashProbHint');
+  if (hint) hint.textContent = `＝ 約${years}年に1回の頻度${prob <= 10 ? '（歴史的平均に近い）' : prob <= 5 ? '（稀なケース）' : '（頻繁）'}`;
+}
+
+function toggleCrash() {
+  crashEnabled = !crashEnabled;
+  const ind   = document.getElementById('crashIndicator');
+  const thumb = document.getElementById('crashThumb');
+  const lbl   = document.getElementById('crashLabel');
+  const cfg   = document.getElementById('crashSettings');
+  const legend = document.getElementById('crashLegend');
+  if (crashEnabled) {
+    ind.style.background   = 'var(--accent-orange)';
+    thumb.style.left       = '18px';
+    thumb.style.background = '#fff';
+    lbl.textContent        = 'ON';
+    lbl.style.color        = 'var(--accent-orange)';
+    cfg.style.display      = 'block';
+    legend.style.display   = 'flex';
+  } else {
+    ind.style.background   = 'var(--bg-tertiary)';
+    thumb.style.left       = '2px';
+    thumb.style.background = 'var(--text-muted)';
+    lbl.textContent        = 'OFF';
+    lbl.style.color        = 'var(--text-secondary)';
+    cfg.style.display      = 'none';
+    legend.style.display   = 'none';
+  }
+  simulate();
+}
+
+// ============================================================
+//  モンテカルロ暴落シミュレーション
+// ============================================================
+function runMonteCarlo(mcParams) {
+  const {
+    currentAge, currentAssets, returnRate,
+    afterTaxIncome, annualSavings, annualExpense, annualSideIncome, annualPension,
+    fireAge, fullFireAge, livingCostRatio65,
+    withdrawalTaxEnabled: wtax,
+    crashProb, crashMag, numSims
+  } = mcParams;
+
+  const endAge = 90;
+  const numYears = endAge - currentAge + 1;
+  const allPaths = [];
+
+  for (let sim = 0; sim < numSims; sim++) {
+    let asset = currentAssets;
+    const path = [];
+
+    for (let age = currentAge; age <= endAge; age++) {
+      const eduCost         = getEduCostForYear(age, currentAge);
+      const effExpense      = age >= 65 ? annualExpense * livingCostRatio65 : annualExpense;
+      const effSideIncome   = age < fullFireAge ? annualSideIncome : 0;
+
+      let cf;
+      if (age < fireAge) {
+        const livingDeficit = Math.max(0, effExpense + eduCost - afterTaxIncome);
+        cf = annualSavings - livingDeficit;
+      } else if (age < 65) {
+        cf = effSideIncome - effExpense - eduCost;
+      } else {
+        cf = effSideIncome + annualPension - effExpense - eduCost;
+      }
+      if (wtax && cf < 0) cf = cf / 0.8;
+
+      // 暴落イベント（年初に発生）
+      if (Math.random() < crashProb) {
+        asset *= (1 - crashMag);
+      }
+
+      asset = Math.max(0, asset * (1 + returnRate) + cf);
+      path.push(Math.round(asset));
+    }
+    allPaths.push(path);
+  }
+
+  // パーセンタイル計算
+  const p10 = [], p50 = [], p90 = [];
+  for (let i = 0; i < numYears; i++) {
+    const vals = allPaths.map(p => p[i]).sort((a, b) => a - b);
+    p10.push(vals[Math.floor(numSims * 0.10)]);
+    p50.push(vals[Math.floor(numSims * 0.50)]);
+    p90.push(vals[Math.floor(numSims * 0.90)]);
+  }
+
+  // 資産枯渇率（90歳時点で0万）
+  const ruinCount = allPaths.filter(p => p[p.length - 1] === 0).length;
+  return { p10, p50, p90, ruinRate: ruinCount / numSims };
+}
 
 function toggleWithdrawalTax() {
   withdrawalTaxEnabled = !withdrawalTaxEnabled;
@@ -936,10 +1090,12 @@ function simulate() {
     let principalAddition = 0;
 
     if (age < fireAge) {
-      // ── FIRE前：毎月の積み立て額が資産に積み上がる ──
-      // （収入・生活費は表示用。実際の投資額 = annualSavings）
-      annualCashflow    = annualSavings - eduCost; // 積み立て − 教育費が純増減
-      principalAddition = annualSavings;
+      // ── FIRE前：積み立て投資 + 生活費不足分は資産から補填 ──
+      // 収入で生活費・教育費をまかなえない分だけ資産を取り崩す
+      const livingDeficit = Math.max(0, effectiveExpense + eduCost - afterTaxIncome);
+      annualCashflow    = annualSavings - livingDeficit;
+      principalAddition = annualSavings; // 元本は積立額のみで増加（マイナスにしない）
+      // ※ 資産がクリップにより元本を下回ったとき、利益から先に消費される
 
     } else if (age < 65) {
       // ── SideFIRE期間（〜65歳未満）──
@@ -987,6 +1143,10 @@ function simulate() {
 
     // 明細テーブル用（収入は手取り表示）
     const income = age < fireAge ? afterTaxIncome : effectiveSideIncome;
+    // FIRE前のCF表示: 手取り − 生活費 − 教育費 − 積み立て（積み立ては収入からの支出）
+    const displayCashflow = age < fireAge
+      ? Math.round(afterTaxIncome - effectiveExpense - eduCost - annualSavings)
+      : Math.round(effectiveCashflow);
     tableRows.push({
       age,
       asset:            Math.round(asset),
@@ -995,7 +1155,7 @@ function simulate() {
       eduCost:          Math.round(eduCost),
       pension:          age >= 65 ? Math.round(annualPension) : 0,
       savings:          age < fireAge ? Math.round(annualSavings) : 0,
-      cashflow:         Math.round(effectiveCashflow),
+      cashflow:         displayCashflow,
       investmentReturn,
       assetChange,
       isFire:     age === fireAge,
@@ -1033,13 +1193,32 @@ function simulate() {
     banner.textContent = `✅ 完全FIRE達成可能！ ${achieve4Age}歳で4%ルール目標に到達見込み`;
   } else if (shortAchievedBefore) {
     banner.className = 'banner show success';
-    banner.textContent = `🎉 SideFIRE達成可能！ ${achieveShortAge}歳で不足分目標に到達見込み`;
+    banner.textContent = `🎉 SideFIRE達成可能！ ${achieveShortAge}歳で副収入収支±0目標に到達見込み`;
   } else {
     banner.className = 'banner show warning';
     banner.textContent = '⚠️ 現在の設定では目標達成が難しい可能性があります';
   }
 
-  updateChart(ages, principalData, gainData, target4pct, targetShort, fireAge, fullFireAge, currentAge);
+  // モンテカルロ実行
+  let crashData = null;
+  if (crashEnabled) {
+    const crashProb = getNum('crashProb', 10) / 100;
+    const crashMag  = getNum('crashMag',  40) / 100;
+    crashData = runMonteCarlo({
+      currentAge, currentAssets, returnRate,
+      afterTaxIncome, annualSavings, annualExpense: annualExpense,
+      annualSideIncome, annualPension,
+      fireAge, fullFireAge, livingCostRatio65,
+      withdrawalTaxEnabled,
+      crashProb, crashMag, numSims: 300
+    });
+    // 資産枯渇リスクをバナーに追記
+    const ruinPct = Math.round(crashData.ruinRate * 100);
+    const existing = banner.textContent;
+    banner.textContent = existing + `　｜　⚠ 暴落シナリオ: 資産枯渇リスク ${ruinPct}%`;
+  }
+
+  updateChart(ages, principalData, gainData, target4pct, targetShort, fireAge, fullFireAge, currentAge, crashData);
   updateEduTable(currentAge);
   updateAssetTable(tableRows, fireAge, fullFireAge);
   saveToStorage();
@@ -1068,7 +1247,7 @@ function buildAnnotations(ages, target4pct, targetShort, fireAge, fullFireAge, c
       type: 'line', yMin: targetShort, yMax: targetShort,
       borderColor: 'rgba(210,153,34,0.8)', borderWidth: 2, borderDash: [6,4],
       label: {
-        display: true, content: `不足分目標: ${formatMan(targetShort)}`,
+        display: true, content: `副収入収支±0: ${formatMan(targetShort)}`,
         position: 'start', backgroundColor: 'rgba(210,153,34,0.18)',
         color: '#e3b341', font: { size: 10 }, padding: { x:6, y:3 }, borderRadius: 4
       }
@@ -1137,7 +1316,33 @@ function buildAnnotations(ages, target4pct, targetShort, fireAge, fullFireAge, c
   return ann;
 }
 
-function updateChart(ages, principalData, gainData, target4pct, targetShort, fireAge, fullFireAge, currentAge) {
+function makeCrashDatasets() {
+  // yAxisID: 'y2' で棒グラフ（スタック軸）とは別の非スタック軸を使う
+  // → スタッキングの影響を受けずに絶対値で正しい位置に描画される
+  return [
+    { // p90 楽観
+      label: '楽観(90%ile)', type: 'line', data: [],
+      borderColor: 'rgba(46,160,67,1)', borderWidth: 2.5,
+      pointRadius: 0, tension: 0.3, fill: false, hidden: true,
+      yAxisID: 'y2', order: 0
+    },
+    { // p50 中央値
+      label: '中央値(50%ile)', type: 'line', data: [],
+      borderColor: 'rgba(210,153,34,1)', borderWidth: 2.5,
+      pointRadius: 0, tension: 0.3, fill: false, hidden: true,
+      borderDash: [6, 3], yAxisID: 'y2', order: 0
+    },
+    { // p10 悲観 — p90との間を帯で塗る（target: 2 = p90のデータセットindex）
+      label: '悲観(10%ile)', type: 'line', data: [],
+      borderColor: 'rgba(248,81,73,1)', borderWidth: 2.5,
+      pointRadius: 0, tension: 0.3,
+      fill: { target: 2, below: 'rgba(200,160,100,0.20)', above: 'rgba(0,0,0,0)' },
+      hidden: true, yAxisID: 'y2', order: 0
+    }
+  ];
+}
+
+function updateChart(ages, principalData, gainData, target4pct, targetShort, fireAge, fullFireAge, currentAge, crashData = null) {
   const ctx = document.getElementById('assetChart').getContext('2d');
   const annotations = buildAnnotations(ages, target4pct, targetShort, fireAge, fullFireAge, currentAge);
 
@@ -1145,6 +1350,17 @@ function updateChart(ages, principalData, gainData, target4pct, targetShort, fir
     chart.data.labels = ages;
     chart.data.datasets[0].data = principalData;
     chart.data.datasets[1].data = gainData;
+    // 暴落ラインの更新
+    const ds = chart.data.datasets;
+    if (crashData) {
+      ds[2].data = crashData.p90; ds[2].hidden = false;
+      ds[3].data = crashData.p50; ds[3].hidden = false;
+      ds[4].data = crashData.p10; ds[4].hidden = false;
+    } else {
+      ds[2].data = []; ds[2].hidden = true;
+      ds[3].data = []; ds[3].hidden = true;
+      ds[4].data = []; ds[4].hidden = true;
+    }
     chart.options.plugins.annotation.annotations = annotations;
     chart.update('none');
   } else {
@@ -1154,9 +1370,10 @@ function updateChart(ages, principalData, gainData, target4pct, targetShort, fir
         labels: ages,
         datasets: [
           { label: '累積元本', data: principalData,
-            backgroundColor: 'rgba(56,139,253,0.75)', borderWidth: 0, stack: 'assets' },
+            backgroundColor: 'rgba(56,139,253,0.75)', borderWidth: 0, stack: 'assets', order: 1 },
           { label: '運用益',   data: gainData,
-            backgroundColor: 'rgba(45,212,191,0.70)', borderWidth: 0, stack: 'assets' }
+            backgroundColor: 'rgba(45,212,191,0.70)', borderWidth: 0, stack: 'assets', order: 1 },
+          ...makeCrashDatasets()
         ]
       },
       options: {
@@ -1168,16 +1385,31 @@ function updateChart(ages, principalData, gainData, target4pct, targetShort, fir
             callbacks: {
               title: items => `${items[0].label}歳`,
               label: item => {
-                if (item.datasetIndex !== 1) return null;
-                const p = item.chart.data.datasets[0].data[item.dataIndex] || 0;
-                const g = item.raw || 0;
-                return [
-                  `  元本: ${formatMan(p)}`,
-                  `  運用益: ${formatMan(g)}`,
-                  `  合計: ${formatMan(p + g)}`
-                ];
+                const ds = item.chart.data.datasets;
+                if (item.datasetIndex === 1) {
+                  const p = ds[0].data[item.dataIndex] || 0;
+                  const g = item.raw || 0;
+                  const lines = [
+                    `  元本: ${formatMan(p)}`,
+                    `  運用益: ${formatMan(g)}`,
+                    `  合計: ${formatMan(p + g)}`
+                  ];
+                  return lines;
+                }
+                if (item.datasetIndex === 2 && !ds[2].hidden)
+                  return `  楽観(90%): ${formatMan(item.raw)}`;
+                if (item.datasetIndex === 3 && !ds[3].hidden)
+                  return `  中央値(50%): ${formatMan(item.raw)}`;
+                if (item.datasetIndex === 4 && !ds[4].hidden)
+                  return `  悲観(10%): ${formatMan(item.raw)}`;
+                return null;
               },
-              filter: item => item.datasetIndex === 1
+              filter: item => {
+                const ds = item.chart.data.datasets;
+                if (item.datasetIndex === 1) return true;
+                if ([2,3,4].includes(item.datasetIndex) && !ds[item.datasetIndex].hidden) return true;
+                return false;
+              }
             },
             backgroundColor: 'rgba(22,27,34,0.95)',
             borderColor: 'rgba(48,54,61,0.8)', borderWidth: 1,
@@ -1216,10 +1448,28 @@ function updateChart(ages, principalData, gainData, target4pct, targetShort, fir
               }
             },
             border: { color: 'rgba(48,54,61,0.6)' }
+          },
+          y2: {
+            // 暴落ライン専用の非スタック軸（目盛り非表示・y軸と同じスケールで同期）
+            type: 'linear', display: false, stacked: false,
+            grid: { display: false }, ticks: { display: false }
           }
         },
         barPercentage: 0.95, categoryPercentage: 0.98
-      }
+      },
+      plugins: [{
+        // y と y2 のスケールを同期するインラインプラグイン
+        id: 'syncAxes',
+        afterDataLimits(chart, args) {
+          const y  = chart.scales['y'];
+          const y2 = chart.scales['y2'];
+          if (!y || !y2) return;
+          if (args.scale.id === 'y2') {
+            args.scale.min = y.min;
+            args.scale.max = y.max;
+          }
+        }
+      }]
     });
   }
 }
@@ -1303,7 +1553,7 @@ function updateAssetTable(rows, fireAge, fullFireAge) {
           <th>生活費(万)</th>
           <th>教育費(万)</th>
           <th>年金(万)</th>
-          <th title="FIRE前: 積立−教育費 / SideFIRE: 副収入−生活費−教育費 / 65歳〜: +年金">CF(万)</th>
+          <th title="FIRE前: 手取り−生活費−教育費−積立 / SideFIRE: 副収入−生活費−教育費 / 65歳〜: +年金">CF(万)</th>
           <th>利回り益(万)</th>
           <th>前年比(万)</th>
         </tr>
@@ -1366,6 +1616,7 @@ function onRadioChange() {
 
   // localStorage から復元、なければデフォルト2名
   const restored = loadFromStorage();
+  syncFireSliderMin(); // 読み込んだ fireAge に基づいて完全FIRE年齢の min を再設定
   if (!restored) {
     addChild({ age: 10, elementary: 'public', middle: 'public', high: 'public', univ: 'national',
                customEnabled: false, custom: { elementary: 35, middle: 54, high: 51, univ: 61 } });
