@@ -436,7 +436,14 @@
         <div style="font-size:10px;color:var(--text-muted);margin-top:4px;">ONで取り崩し額を1.25倍（税20%を考慮）</div>
       </div>
       <div class="form-group">
-        <label>暴落シミュレーション <span style="font-size:10px;color:var(--accent-orange);">モンテカルロ</span></label>
+        <label style="display:flex;align-items:center;gap:6px;">
+          暴落シミュレーション
+          <span style="font-size:10px;color:var(--accent-orange);">モンテカルロ</span>
+          <button onclick="showCrashInfo()" title="モデルの考え方を見る"
+            style="width:18px;height:18px;border-radius:50%;border:1.5px solid var(--accent-blue);
+                   background:transparent;color:var(--accent-blue);font-size:11px;font-weight:700;
+                   cursor:pointer;line-height:1;padding:0;flex-shrink:0;">i</button>
+        </label>
         <div style="display:flex;align-items:center;gap:10px;margin-top:4px;">
           <div id="crashToggle" onclick="toggleCrash()"
                style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;">
@@ -527,7 +534,7 @@
         <div class="card-sub" id="card-edu-sub">全子供の合計</div>
       </div>
       <div class="result-card green">
-        <div class="card-label"><span class="card-icon green">💰</span>90歳時点の資産</div>
+        <div class="card-label"><span class="card-icon green">💰</span>100歳時点の資産</div>
         <div class="card-value green" id="card-final">― 万円</div>
         <div class="card-sub" id="card-final-sub">シミュレーション最終値</div>
       </div>
@@ -543,6 +550,7 @@
         <div class="chart-legend">
           <div class="legend-item"><div class="legend-dot" style="background:#388bfd"></div><span>累積元本</span></div>
           <div class="legend-item"><div class="legend-dot" style="background:#2dd4bf"></div><span>運用益</span></div>
+
           <div class="legend-item"><div class="legend-line" style="border-color:#f85149"></div><span>4%ルール目標</span></div>
           <div class="legend-item"><div class="legend-line" style="border-color:#d29922"></div><span>副収入収支±0目標</span></div>
           <div class="legend-item"><div class="legend-line" style="border-color:#388bfd;border-style:solid"></div><span>FIRE年齢</span></div>
@@ -554,6 +562,21 @@
             <div class="legend-item"><div class="legend-line" style="border-color:#f85149;border-style:solid"></div><span>悲観(10%)</span></div>
           </div>
         </div>
+      </div>
+      <!-- 表示年齢範囲コントロール -->
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;padding:6px 10px;
+                  background:var(--bg-secondary);border-radius:8px;border:1px solid var(--border-light);">
+        <span style="font-size:12px;font-weight:700;color:var(--text-primary);white-space:nowrap;">📊 表示範囲</span>
+        <input type="range" id="chartMaxAgeSlider" min="40" max="100" value="100" step="5"
+          style="flex:1;max-width:160px;accent-color:var(--accent-blue);cursor:pointer;"
+          oninput="onChartMaxAgeChange(this.value)">
+        <span id="chartMaxAgeVal"
+          style="font-size:13px;font-weight:700;color:var(--accent-blue);white-space:nowrap;min-width:58px;">
+          100歳まで
+        </span>
+        <span style="font-size:10px;color:var(--text-muted);white-space:nowrap;">
+          ← 絞るとY軸も自動調整
+        </span>
       </div>
       <div class="chart-container">
         <canvas id="assetChart"></canvas>
@@ -577,6 +600,139 @@
   </main>
 </div>
 
+<!-- ========== 暴落モデル説明モーダル ========== -->
+<div id="crashInfoOverlay" onclick="hideCrashInfo()"
+  style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:1000;
+         justify-content:center;align-items:center;padding:16px;">
+  <div onclick="event.stopPropagation()"
+    style="background:var(--bg-secondary);border:1px solid var(--border-light);border-radius:14px;
+           max-width:520px;width:100%;max-height:90vh;overflow-y:auto;padding:24px;
+           box-shadow:0 20px 60px rgba(0,0,0,0.6);position:relative;">
+
+    <!-- ヘッダー -->
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <div style="font-size:15px;font-weight:700;color:var(--text-primary);">
+        📉 暴落シミュレーション — モデルの考え方
+      </div>
+      <button onclick="hideCrashInfo()"
+        style="background:transparent;border:none;color:var(--text-muted);font-size:20px;
+               cursor:pointer;line-height:1;padding:2px 6px;border-radius:4px;">✕</button>
+    </div>
+
+    <!-- モデルの仕組み -->
+    <div style="margin-bottom:16px;">
+      <div style="font-size:12px;font-weight:700;color:var(--accent-orange);margin-bottom:6px;">
+        ⚙️ このシミュレーターのモデル
+      </div>
+      <div style="font-size:12px;color:var(--text-secondary);line-height:1.8;">
+        毎年「暴落確率/年」で設定した確率で<strong style="color:var(--text-primary);">1回だけ</strong>暴落イベントが発生し、
+        設定した下落幅で資産が減少します。
+        その後は<strong style="color:var(--text-primary);">翌年から通常の年間利回りで自然回復</strong>するシンプルなモデルです。
+      </div>
+      <div style="margin-top:8px;padding:10px;background:var(--bg-tertiary);border-radius:8px;
+                  font-size:11px;color:var(--text-secondary);line-height:1.7;">
+        <div>① 年初に乱数で暴落判定</div>
+        <div>② 暴落発生 → 資産 × (1 − 下落幅)</div>
+        <div>③ 同年末に通常利回りで複利運用</div>
+        <div>④ これを300通りシミュレートし、悲観/中央値/楽観に分類</div>
+      </div>
+    </div>
+
+    <!-- 回復期間 -->
+    <div style="margin-bottom:16px;">
+      <div style="font-size:12px;font-weight:700;color:var(--accent-teal);margin-bottom:6px;">
+        🔄 暴落後の回復期間（目安）
+      </div>
+      <div style="font-size:12px;color:var(--text-secondary);line-height:1.7;">
+        回復にかかる年数は<strong style="color:var(--text-primary);">年間利回り設定に依存</strong>します。
+        例として 40% 暴落の場合：
+      </div>
+      <table style="width:100%;font-size:11px;margin-top:8px;border-collapse:collapse;">
+        <tr style="color:var(--text-muted);border-bottom:1px solid var(--border-light);">
+          <th style="text-align:left;padding:4px 6px;">年間利回り</th>
+          <th style="text-align:center;padding:4px 6px;">40%暴落後の回復年数</th>
+          <th style="text-align:center;padding:4px 6px;">34%暴落後の回復年数</th>
+        </tr>
+        <tr style="color:var(--text-secondary);border-bottom:1px solid var(--bg-tertiary);">
+          <td style="padding:4px 6px;">3%</td>
+          <td style="text-align:center;padding:4px 6px;">約 17 年</td>
+          <td style="text-align:center;padding:4px 6px;">約 13 年</td>
+        </tr>
+        <tr style="color:var(--text-secondary);border-bottom:1px solid var(--bg-tertiary);">
+          <td style="padding:4px 6px;">5%</td>
+          <td style="text-align:center;padding:4px 6px;">約 10 年</td>
+          <td style="text-align:center;padding:4px 6px;">約 8 年</td>
+        </tr>
+        <tr style="color:var(--text-secondary);">
+          <td style="padding:4px 6px;">7%</td>
+          <td style="text-align:center;padding:4px 6px;">約 8 年</td>
+          <td style="text-align:center;padding:4px 6px;">約 6 年</td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- 実績比較 -->
+    <div style="margin-bottom:16px;">
+      <div style="font-size:12px;font-weight:700;color:var(--accent-blue);margin-bottom:6px;">
+        📊 実際の主な暴落と回復実績（S&P500 / 日本株）
+      </div>
+      <table style="width:100%;font-size:11px;border-collapse:collapse;">
+        <tr style="color:var(--text-muted);border-bottom:1px solid var(--border-light);">
+          <th style="text-align:left;padding:4px 6px;">出来事</th>
+          <th style="text-align:center;padding:4px 6px;">下落幅</th>
+          <th style="text-align:center;padding:4px 6px;">回復期間</th>
+        </tr>
+        <tr style="color:var(--text-secondary);border-bottom:1px solid var(--bg-tertiary);">
+          <td style="padding:4px 6px;">コロナ暴落（2020）</td>
+          <td style="text-align:center;padding:4px 6px;">−34%</td>
+          <td style="text-align:center;padding:4px 6px;color:var(--accent-teal);">約6ヶ月</td>
+        </tr>
+        <tr style="color:var(--text-secondary);border-bottom:1px solid var(--bg-tertiary);">
+          <td style="padding:4px 6px;">リーマンショック（2008）</td>
+          <td style="text-align:center;padding:4px 6px;">−57%</td>
+          <td style="text-align:center;padding:4px 6px;">約5〜6年</td>
+        </tr>
+        <tr style="color:var(--text-secondary);border-bottom:1px solid var(--bg-tertiary);">
+          <td style="padding:4px 6px;">ITバブル崩壊（2000）</td>
+          <td style="text-align:center;padding:4px 6px;">−49%</td>
+          <td style="text-align:center;padding:4px 6px;">約7年</td>
+        </tr>
+        <tr style="color:var(--text-secondary);border-bottom:1px solid var(--bg-tertiary);">
+          <td style="padding:4px 6px;">日本バブル崩壊（1989）</td>
+          <td style="text-align:center;padding:4px 6px;">−80%</td>
+          <td style="text-align:center;padding:4px 6px;color:rgba(248,81,73,0.9);">30年以上※</td>
+        </tr>
+        <tr style="color:var(--text-secondary);">
+          <td style="padding:4px 6px;">大恐慌（1929）</td>
+          <td style="text-align:center;padding:4px 6px;">−86%</td>
+          <td style="text-align:center;padding:4px 6px;color:rgba(248,81,73,0.9);">約25年</td>
+        </tr>
+      </table>
+      <div style="font-size:10px;color:var(--text-muted);margin-top:6px;">
+        ※ 日経平均は2024年にようやく最高値を更新。米国株と回復速度が大きく異なります。
+      </div>
+    </div>
+
+    <!-- モデルの注意点 -->
+    <div style="padding:10px 12px;background:rgba(210,153,34,0.1);border:1px solid rgba(210,153,34,0.3);
+                border-radius:8px;font-size:11px;color:var(--text-secondary);line-height:1.7;">
+      <strong style="color:var(--accent-orange);">⚠️ モデルの限界</strong><br>
+      このモデルでは「1年で一括下落→翌年から回復」と単純化しています。
+      実際の暴落は複数年にわたる段階的な下落が多いため、
+      <strong style="color:var(--text-primary);">中長期的なリスク傾向の把握</strong>に使うことをおすすめします。
+      精密な予測には使えません。
+    </div>
+
+    <div style="text-align:center;margin-top:16px;">
+      <button onclick="hideCrashInfo()"
+        style="padding:8px 28px;background:var(--accent-blue);color:#fff;border:none;
+               border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;">
+        閉じる
+      </button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ============================================================
 //  定数・デフォルト
@@ -591,6 +747,7 @@ const EDU_DEFAULTS = {
 let children = [];
 let childIdCounter = 0;
 let chart = null;
+let chartMaxAge = 100;  // グラフ表示終了年齢
 const STORAGE_KEY = 'sidefire_v2';
 
 // ============================================================
@@ -624,6 +781,7 @@ function saveToStorage() {
       crashEnabled: crashEnabled,
       crashProb:    document.getElementById('crashProb').value,
       crashMag:     document.getElementById('crashMag').value,
+      chartMaxAge:  chartMaxAge,
       children:       children
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -671,6 +829,14 @@ function loadFromStorage() {
       if (d.crashMag)  { document.getElementById('crashMag').value  = d.crashMag;  document.getElementById('crashMagVal').textContent  = d.crashMag  + '%'; }
       crashEnabled = false;
       toggleCrash();
+    }
+    if (d.chartMaxAge) {
+      chartMaxAge = +d.chartMaxAge;
+      const slider = document.getElementById('chartMaxAgeSlider');
+      if (slider) {
+        slider.value = chartMaxAge;
+        document.getElementById('chartMaxAgeVal').textContent = `${chartMaxAge}歳まで`;
+      }
     }
     if (Array.isArray(d.children) && d.children.length > 0) {
       children = d.children;
@@ -881,6 +1047,43 @@ function updateCrashHint() {
   if (hint) hint.textContent = `＝ 約${years}年に1回の頻度${prob <= 10 ? '（歴史的平均に近い）' : prob <= 5 ? '（稀なケース）' : '（頻繁）'}`;
 }
 
+// ============================================================
+//  暴落モデル説明モーダル
+// ============================================================
+function showCrashInfo() {
+  const el = document.getElementById('crashInfoOverlay');
+  el.style.display = 'flex';
+}
+function hideCrashInfo() {
+  document.getElementById('crashInfoOverlay').style.display = 'none';
+}
+// Escキーで閉じる
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') hideCrashInfo();
+});
+
+// ============================================================
+//  グラフ表示年齢スライダー
+// ============================================================
+function onChartMaxAgeChange(val) {
+  chartMaxAge = +val;
+  document.getElementById('chartMaxAgeVal').textContent = `${val}歳まで`;
+  simulate();
+}
+
+function syncChartMaxAgeSlider(currentAge) {
+  const slider = document.getElementById('chartMaxAgeSlider');
+  if (!slider) return;
+  const minAge = Math.min(currentAge + 5, 95);  // 最低でも5年は表示
+  slider.min = minAge;
+  if (chartMaxAge < minAge) {
+    chartMaxAge = minAge;
+    slider.value = minAge;
+    document.getElementById('chartMaxAgeVal').textContent = `${minAge}歳まで`;
+  }
+  slider.value = chartMaxAge;
+}
+
 function toggleCrash() {
   crashEnabled = !crashEnabled;
   const ind   = document.getElementById('crashIndicator');
@@ -920,7 +1123,7 @@ function runMonteCarlo(mcParams) {
     crashProb, crashMag, numSims
   } = mcParams;
 
-  const endAge = 90;
+  const endAge = 100;
   const numYears = endAge - currentAge + 1;
   const allPaths = [];
 
@@ -942,12 +1145,13 @@ function runMonteCarlo(mcParams) {
       } else {
         cf = effSideIncome + annualPension - effExpense - eduCost;
       }
-      if (wtax && cf < 0) cf = cf / 0.8;
 
       // 暴落イベント（年初に発生）
       if (Math.random() < crashProb) {
         asset *= (1 - crashMag);
       }
+
+      if (wtax && cf < 0) cf = cf / 0.8;
 
       asset = Math.max(0, asset * (1 + returnRate) + cf);
       path.push(Math.round(asset));
@@ -964,7 +1168,7 @@ function runMonteCarlo(mcParams) {
     p90.push(vals[Math.floor(numSims * 0.90)]);
   }
 
-  // 資産枯渇率（90歳時点で0万）
+  // 資産枯渇率（100歳時点で0万）
   const ruinCount = allPaths.filter(p => p[p.length - 1] === 0).length;
   return { p10, p50, p90, ruinRate: ruinCount / numSims };
 }
@@ -1048,6 +1252,9 @@ function simulate() {
     document.querySelector('input[name="livingCostRatio65"]:checked')?.value || '1.00'
   );
 
+  // 表示年齢スライダーの min を現在年齢に合わせて更新
+  syncChartMaxAgeSlider(currentAge);
+
   // 手取り計算・表示
   const afterTaxIncome = calcAfterTaxIncome(annualIncome);
   const afterTaxDisplay = document.getElementById('afterTaxDisplay');
@@ -1066,7 +1273,7 @@ function simulate() {
   const shortfallAnn = Math.max(0, (monthlyExpense - sideIncomeM) * 12);
   const targetShort  = shortfallAnn > 0 ? shortfallAnn * 25 : 0;
 
-  const endAge = 90;
+  const endAge = 100;
   const ages = [];
   const principalData = [];
   const gainData      = [];
@@ -1112,10 +1319,10 @@ function simulate() {
       principalAddition = pensionSurplus;
     }
 
-    // 取り崩し税（20%）: キャッシュフローが負の場合、実際にはより多く売却が必要
+    // 取り崩し税（20%）: CF赤字なら投資資産から取り崩し
     let effectiveCashflow = annualCashflow;
-    if (withdrawalTaxEnabled && annualCashflow < 0) {
-      effectiveCashflow = annualCashflow / 0.8; // 税引き後で必要額を確保するには1.25倍売却
+    if (withdrawalTaxEnabled && effectiveCashflow < 0) {
+      effectiveCashflow = effectiveCashflow / 0.8;
     }
 
     // 資産更新（年複利）
@@ -1344,34 +1551,63 @@ function makeCrashDatasets() {
 
 function updateChart(ages, principalData, gainData, target4pct, targetShort, fireAge, fullFireAge, currentAge, crashData = null) {
   const ctx = document.getElementById('assetChart').getContext('2d');
-  const annotations = buildAnnotations(ages, target4pct, targetShort, fireAge, fullFireAge, currentAge);
+
+  // ── 表示範囲フィルタ（chartMaxAge までに切り取る）──
+  const cutIdx = ages.findIndex(a => a > chartMaxAge);
+  const dispLen = cutIdx >= 0 ? cutIdx : ages.length;
+  const dispAges      = ages.slice(0, dispLen);
+  const dispPrincipal = principalData.slice(0, dispLen);
+  const dispGain      = gainData.slice(0, dispLen);
+  const dispCrash     = crashData ? {
+    p90: crashData.p90.slice(0, dispLen),
+    p50: crashData.p50.slice(0, dispLen),
+    p10: crashData.p10.slice(0, dispLen),
+  } : null;
+
+  const annotations = buildAnnotations(dispAges, target4pct, targetShort, fireAge, fullFireAge, currentAge);
+
+  // ── y / y2 の共通 max を手動計算（syncAxes プラグイン廃止）──
+  // afterDataLimits はスタック合算前に呼ばれるため同期がズレる。
+  // データから直接 max を求めて両軸に明示設定することで確実に一致させる。
+  let yMax = 0;
+  for (let i = 0; i < dispLen; i++) {
+    yMax = Math.max(yMax, (dispPrincipal[i] || 0) + (dispGain[i] || 0));
+    if (dispCrash) yMax = Math.max(yMax, dispCrash.p90[i] || 0);
+  }
+  yMax = Math.max(yMax, 100) * 1.06; // 6% 余白
+
+  // データセット構成（index）: 0: 累積元本, 1: 運用益, 2: 楽観, 3: 中央値, 4: 悲観
 
   if (chart) {
-    chart.data.labels = ages;
-    chart.data.datasets[0].data = principalData;
-    chart.data.datasets[1].data = gainData;
-    // 暴落ラインの更新
+    chart.data.labels = dispAges;
+    chart.data.datasets[0].data = dispPrincipal;
+    chart.data.datasets[1].data = dispGain;
+    // 暴落ラインの更新（index 2,3,4）
     const ds = chart.data.datasets;
-    if (crashData) {
-      ds[2].data = crashData.p90; ds[2].hidden = false;
-      ds[3].data = crashData.p50; ds[3].hidden = false;
-      ds[4].data = crashData.p10; ds[4].hidden = false;
+    if (dispCrash) {
+      ds[2].data = dispCrash.p90; ds[2].hidden = false;
+      ds[3].data = dispCrash.p50; ds[3].hidden = false;
+      ds[4].data = dispCrash.p10; ds[4].hidden = false;
     } else {
       ds[2].data = []; ds[2].hidden = true;
       ds[3].data = []; ds[3].hidden = true;
       ds[4].data = []; ds[4].hidden = true;
     }
+    chart.options.scales.y.max  = yMax;
+    chart.options.scales.y2.max = yMax;
+    chart.options.scales.y.min  = 0;
+    chart.options.scales.y2.min = 0;
     chart.options.plugins.annotation.annotations = annotations;
     chart.update('none');
   } else {
     chart = new Chart(ctx, {
       type: 'bar',
       data: {
-        labels: ages,
+        labels: dispAges,
         datasets: [
-          { label: '累積元本', data: principalData,
+          { label: '累積元本', data: dispPrincipal,
             backgroundColor: 'rgba(56,139,253,0.75)', borderWidth: 0, stack: 'assets', order: 1 },
-          { label: '運用益',   data: gainData,
+          { label: '運用益',   data: dispGain,
             backgroundColor: 'rgba(45,212,191,0.70)', borderWidth: 0, stack: 'assets', order: 1 },
           ...makeCrashDatasets()
         ]
@@ -1432,7 +1668,7 @@ function updateChart(ages, principalData, gainData, target4pct, targetShort, fir
             border: { color: 'rgba(48,54,61,0.6)' }
           },
           y: {
-            stacked: true,
+            stacked: true, min: 0, max: yMax,
             grid: { color: 'rgba(48,54,61,0.4)' },
             ticks: {
               color: '#656d76', font: { size: 10 }, maxTicksLimit: 8,
@@ -1450,26 +1686,15 @@ function updateChart(ages, principalData, gainData, target4pct, targetShort, fir
             border: { color: 'rgba(48,54,61,0.6)' }
           },
           y2: {
-            // 暴落ライン専用の非スタック軸（目盛り非表示・y軸と同じスケールで同期）
+            // 暴落ライン専用の非スタック軸（y と同じ max を明示設定し位置を一致させる）
             type: 'linear', display: false, stacked: false,
+            min: 0, max: yMax,
             grid: { display: false }, ticks: { display: false }
           }
         },
         barPercentage: 0.95, categoryPercentage: 0.98
       },
-      plugins: [{
-        // y と y2 のスケールを同期するインラインプラグイン
-        id: 'syncAxes',
-        afterDataLimits(chart, args) {
-          const y  = chart.scales['y'];
-          const y2 = chart.scales['y2'];
-          if (!y || !y2) return;
-          if (args.scale.id === 'y2') {
-            args.scale.min = y.min;
-            args.scale.max = y.max;
-          }
-        }
-      }]
+      plugins: []
     });
   }
 }
