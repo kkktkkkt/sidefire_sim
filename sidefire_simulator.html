@@ -476,6 +476,43 @@
               oninput="document.getElementById('crashMagVal').textContent=this.value+'%'; simulate();">
             <div style="font-size:10px;color:var(--text-muted);margin-top:2px;">参考: ITバブル崩壊-49%・リーマン-57%・コロナ-34%</div>
           </div>
+          <!-- 回復ブーストトグル -->
+          <div style="margin-top:10px;padding:8px 10px;background:rgba(46,160,67,0.08);
+                      border:1px solid rgba(46,160,67,0.25);border-radius:8px;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+              <div id="recoveryToggle" onclick="toggleRecovery()"
+                   style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;">
+                <div id="recoveryIndicator" style="
+                  width:36px;height:20px;border-radius:10px;background:var(--bg-tertiary);
+                  border:1px solid var(--border-light);position:relative;transition:background 0.2s;">
+                  <div id="recoveryThumb" style="
+                    position:absolute;top:2px;left:2px;width:14px;height:14px;
+                    border-radius:50%;background:var(--text-muted);transition:all 0.2s;"></div>
+                </div>
+                <span id="recoveryLabel" style="font-size:12px;font-weight:600;color:var(--text-secondary);">
+                  回復ブースト: OFF
+                </span>
+              </div>
+            </div>
+            <div id="recoverySettings" style="display:none;margin-top:8px;">
+              <div class="slider-group" style="margin-bottom:0;">
+                <div class="slider-label-row">
+                  <label style="font-size:11px;">暴落後の回復期間</label>
+                  <span class="slider-value" id="recoveryYearsVal" style="font-size:11px;">5年</span>
+                </div>
+                <input type="range" id="recoveryYears" min="1" max="10" value="5" step="1"
+                  oninput="document.getElementById('recoveryYearsVal').textContent=this.value+'年'; simulate();">
+                <div style="font-size:10px;color:rgba(46,160,67,0.9);margin-top:2px;line-height:1.6;">
+                  回復中の実効利回り ＝ 通常利回り＋<b>暴落幅÷回復期間</b><br>
+                  参考: コロナ5ヶ月・リーマン5年・ITバブル7年・日本バブル未回復
+                </div>
+              </div>
+            </div>
+            <div style="font-size:10px;color:var(--text-muted);margin-top:4px;">
+              ONにすると暴落後に市場が反発回復する動きを加味します
+            </div>
+          </div>
+
           <div style="background:rgba(210,153,34,0.08);border:1px solid rgba(210,153,34,0.25);border-radius:6px;padding:8px;margin-top:8px;font-size:10px;line-height:1.7;color:var(--text-secondary);">
             <div style="color:var(--accent-orange);font-weight:600;margin-bottom:4px;">📊 グラフの見方</div>
             <div>棒グラフ ＝ <b>暴落なし</b>の基本シナリオ</div>
@@ -781,6 +818,8 @@ function saveToStorage() {
       crashEnabled: crashEnabled,
       crashProb:    document.getElementById('crashProb').value,
       crashMag:     document.getElementById('crashMag').value,
+      recoveryEnabled: recoveryEnabled,
+      recoveryYears:   document.getElementById('recoveryYears').value,
       chartMaxAge:  chartMaxAge,
       children:       children
     };
@@ -829,6 +868,14 @@ function loadFromStorage() {
       if (d.crashMag)  { document.getElementById('crashMag').value  = d.crashMag;  document.getElementById('crashMagVal').textContent  = d.crashMag  + '%'; }
       crashEnabled = false;
       toggleCrash();
+    }
+    if (d.recoveryEnabled) {
+      if (d.recoveryYears) {
+        document.getElementById('recoveryYears').value = d.recoveryYears;
+        document.getElementById('recoveryYearsVal').textContent = d.recoveryYears + '年';
+      }
+      recoveryEnabled = false;
+      toggleRecovery();
     }
     if (d.chartMaxAge) {
       chartMaxAge = +d.chartMaxAge;
@@ -1039,6 +1086,7 @@ function getEduCostForYear(year, currentAge) {
 // ============================================================
 let withdrawalTaxEnabled = false;
 let crashEnabled = false;
+let recoveryEnabled = false;  // 暴落後回復ブースト
 
 function updateCrashHint() {
   const prob = getNum('crashProb', 10);
@@ -1111,6 +1159,30 @@ function toggleCrash() {
   simulate();
 }
 
+function toggleRecovery() {
+  recoveryEnabled = !recoveryEnabled;
+  const ind   = document.getElementById('recoveryIndicator');
+  const thumb = document.getElementById('recoveryThumb');
+  const lbl   = document.getElementById('recoveryLabel');
+  const cfg   = document.getElementById('recoverySettings');
+  if (recoveryEnabled) {
+    ind.style.background   = 'var(--accent-green)';
+    thumb.style.left       = '18px';
+    thumb.style.background = '#fff';
+    lbl.textContent        = '回復ブースト: ON';
+    lbl.style.color        = 'var(--accent-green)';
+    cfg.style.display      = 'block';
+  } else {
+    ind.style.background   = 'var(--bg-tertiary)';
+    thumb.style.left       = '2px';
+    thumb.style.background = 'var(--text-muted)';
+    lbl.textContent        = '回復ブースト: OFF';
+    lbl.style.color        = 'var(--text-secondary)';
+    cfg.style.display      = 'none';
+  }
+  simulate();
+}
+
 // ============================================================
 //  モンテカルロ暴落シミュレーション
 // ============================================================
@@ -1120,7 +1192,8 @@ function runMonteCarlo(mcParams) {
     afterTaxIncome, annualSavings, annualExpense, annualSideIncome, annualPension,
     fireAge, fullFireAge, livingCostRatio65,
     withdrawalTaxEnabled: wtax,
-    crashProb, crashMag, numSims
+    crashProb, crashMag, numSims,
+    recoveryEnabled: recov, recoveryYears: recovYrs
   } = mcParams;
 
   const endAge = 100;
@@ -1130,6 +1203,7 @@ function runMonteCarlo(mcParams) {
   for (let sim = 0; sim < numSims; sim++) {
     let asset = currentAssets;
     const path = [];
+    let recoveryLeft = 0;  // 回復ブースト残り年数
 
     for (let age = currentAge; age <= endAge; age++) {
       const eduCost         = getEduCostForYear(age, currentAge);
@@ -1149,11 +1223,20 @@ function runMonteCarlo(mcParams) {
       // 暴落イベント（年初に発生）
       if (Math.random() < crashProb) {
         asset *= (1 - crashMag);
+        // 回復ブーストONなら回復カウンタをリセット（重ね掛け対応）
+        if (recov) recoveryLeft = recovYrs;
       }
+
+      // 回復ブースト: 回復期間中は実効利回りを加算
+      // 実効利回り = 通常利回り + 暴落幅÷回復期間
+      const effectiveRate = (recov && recoveryLeft > 0)
+        ? returnRate + crashMag / recovYrs
+        : returnRate;
+      if (recoveryLeft > 0) recoveryLeft--;
 
       if (wtax && cf < 0) cf = cf / 0.8;
 
-      asset = Math.max(0, asset * (1 + returnRate) + cf);
+      asset = Math.max(0, asset * (1 + effectiveRate) + cf);
       path.push(Math.round(asset));
     }
     allPaths.push(path);
@@ -1411,13 +1494,15 @@ function simulate() {
   if (crashEnabled) {
     const crashProb = getNum('crashProb', 10) / 100;
     const crashMag  = getNum('crashMag',  40) / 100;
+    const recoveryYears = getNum('recoveryYears', 5);
     crashData = runMonteCarlo({
       currentAge, currentAssets, returnRate,
       afterTaxIncome, annualSavings, annualExpense: annualExpense,
       annualSideIncome, annualPension,
       fireAge, fullFireAge, livingCostRatio65,
       withdrawalTaxEnabled,
-      crashProb, crashMag, numSims: 300
+      crashProb, crashMag, numSims: 300,
+      recoveryEnabled, recoveryYears
     });
     // 資産枯渇リスクをバナーに追記
     const ruinPct = Math.round(crashData.ruinRate * 100);
