@@ -370,6 +370,7 @@
           <input type="number" id="monthlySavings" value="10" min="0">
           <span class="suffix">万円/月</span>
         </div>
+        <div id="savingsWarning" style="display:none;font-size:10px;color:var(--accent-orange);margin-top:4px;line-height:1.5;"></div>
       </div>
       <div class="form-group">
         <label>月の生活費</label>
@@ -413,10 +414,21 @@
       </div>
       <div class="slider-group">
         <div class="slider-label-row">
-          <label>年間利回り</label>
+          <label>年間利回り <span style="font-size:10px;color:var(--text-muted)">名目</span></label>
           <span class="slider-value" id="returnRateVal">5.0%</span>
         </div>
         <input type="range" id="returnRate" min="0" max="150" value="50" step="1">
+      </div>
+      <div class="slider-group">
+        <div class="slider-label-row">
+          <label>インフレ率</label>
+          <span class="slider-value" id="inflationRateVal">1.0%</span>
+        </div>
+        <input type="range" id="inflationRate" min="0" max="50" value="10" step="1">
+        <div id="realRateHint" style="font-size:10px;color:var(--accent-teal);margin-top:2px;"></div>
+        <div style="font-size:10px;color:var(--text-muted);margin-top:2px;line-height:1.5;">
+          金額はすべて現在の物価（現在価値）で表示。収入・生活費・教育費・年金は物価と同率で上昇と仮定
+        </div>
       </div>
       <div class="form-group">
         <label>取り崩し時の税金（20%）</label>
@@ -503,7 +515,8 @@
                 <input type="range" id="recoveryYears" min="1" max="10" value="5" step="1"
                   oninput="document.getElementById('recoveryYearsVal').textContent=this.value+'年'; simulate();">
                 <div style="font-size:10px;color:rgba(46,160,67,0.9);margin-top:2px;line-height:1.6;">
-                  回復中の実効利回り ＝ 通常利回り＋<b>暴落幅÷回復期間</b><br>
+                  回復期間のうちに<b>暴落がなかった場合の水準</b>まで戻るよう利回りを上乗せ<br>
+                  例: 下落40%・回復5年 → 回復中は毎年 約1.11倍 を上乗せ<br>
                   参考: コロナ5ヶ月・リーマン5年・ITバブル7年・日本バブル未回復
                 </div>
               </div>
@@ -583,7 +596,7 @@
     <!-- Chart -->
     <div class="chart-panel">
       <div class="chart-panel-header">
-        <div class="chart-title">資産推移シミュレーション</div>
+        <div class="chart-title">資産推移シミュレーション <span style="font-size:11px;font-weight:400;color:var(--text-muted);">（現在価値）</span></div>
         <div class="chart-legend">
           <div class="legend-item"><div class="legend-dot" style="background:#388bfd"></div><span>累積元本</span></div>
           <div class="legend-item"><div class="legend-dot" style="background:#2dd4bf"></div><span>運用益</span></div>
@@ -630,7 +643,7 @@
 
     <!-- Asset timeline table -->
     <div class="table-panel">
-      <div class="table-title">資産推移明細</div>
+      <div class="table-title">資産推移明細 <span style="font-size:11px;font-weight:400;color:var(--text-muted);">（金額は現在価値）</span></div>
       <div class="asset-table-wrap" id="asset-table-container"></div>
     </div>
 
@@ -812,6 +825,7 @@ function saveToStorage() {
       pension:        document.getElementById('pension').value,
       fireAge:        document.getElementById('fireAge').value,
       returnRate:     document.getElementById('returnRate').value,
+      inflationRate:  document.getElementById('inflationRate').value,
       fullFireAge:    document.getElementById('fullFireAge').value,
       livingCostRatio65: document.querySelector('input[name="livingCostRatio65"]:checked')?.value || '1.00',
       withdrawalTaxEnabled: withdrawalTaxEnabled,
@@ -848,6 +862,10 @@ function loadFromStorage() {
       document.getElementById('returnRate').value = d.returnRate;
       document.getElementById('returnRateVal').textContent = `${(d.returnRate / 10).toFixed(1)}%`;
     }
+    if (d.inflationRate !== undefined) {
+      document.getElementById('inflationRate').value = d.inflationRate;
+      document.getElementById('inflationRateVal').textContent = `${(d.inflationRate / 10).toFixed(1)}%`;
+    }
     if (d.fullFireAge) {
       document.getElementById('fullFireAge').value = d.fullFireAge;
       document.getElementById('fullFireAgeVal').textContent = `${d.fullFireAge}歳`;
@@ -863,17 +881,19 @@ function loadFromStorage() {
       withdrawalTaxEnabled = false;
       toggleWithdrawalTax();
     }
+    // 暴落設定の値は ON/OFF に関係なく復元（OFF中に変えた値も保持する）
+    if (d.crashProb) { document.getElementById('crashProb').value = d.crashProb; document.getElementById('crashProbVal').textContent = d.crashProb + '%'; }
+    if (d.crashMag)  { document.getElementById('crashMag').value  = d.crashMag;  document.getElementById('crashMagVal').textContent  = d.crashMag  + '%'; }
+    if (d.recoveryYears) {
+      document.getElementById('recoveryYears').value = d.recoveryYears;
+      document.getElementById('recoveryYearsVal').textContent = d.recoveryYears + '年';
+    }
+    updateCrashHint();
     if (d.crashEnabled) {
-      if (d.crashProb) { document.getElementById('crashProb').value = d.crashProb; document.getElementById('crashProbVal').textContent = d.crashProb + '%'; }
-      if (d.crashMag)  { document.getElementById('crashMag').value  = d.crashMag;  document.getElementById('crashMagVal').textContent  = d.crashMag  + '%'; }
       crashEnabled = false;
       toggleCrash();
     }
     if (d.recoveryEnabled) {
-      if (d.recoveryYears) {
-        document.getElementById('recoveryYears').value = d.recoveryYears;
-        document.getElementById('recoveryYearsVal').textContent = d.recoveryYears + '年';
-      }
       recoveryEnabled = false;
       toggleRecovery();
     }
@@ -885,13 +905,13 @@ function loadFromStorage() {
         document.getElementById('chartMaxAgeVal').textContent = `${chartMaxAge}歳まで`;
       }
     }
-    if (Array.isArray(d.children) && d.children.length > 0) {
+    if (Array.isArray(d.children)) {
       children = d.children;
       childIdCounter = Math.max(0, ...children.map(c => c.id));
       renderChildren();
-      return true;
     }
-    return false;
+    // 子供0人も保存済みの状態として扱う（false を返すと初期値の子供2人が追加されてしまう）
+    return true;
   } catch(e) { return false; }
 }
 
@@ -1092,7 +1112,8 @@ function updateCrashHint() {
   const prob = getNum('crashProb', 10);
   const years = Math.round(1 / (prob / 100));
   const hint = document.getElementById('crashProbHint');
-  if (hint) hint.textContent = `＝ 約${years}年に1回の頻度${prob <= 10 ? '（歴史的平均に近い）' : prob <= 5 ? '（稀なケース）' : '（頻繁）'}`;
+  const note = prob <= 5 ? '（稀なケース）' : prob <= 10 ? '（歴史的平均に近い）' : '（頻繁）';
+  if (hint) hint.textContent = `＝ 約${years}年に1回の頻度${note}`;
 }
 
 // ============================================================
@@ -1122,14 +1143,13 @@ function onChartMaxAgeChange(val) {
 function syncChartMaxAgeSlider(currentAge) {
   const slider = document.getElementById('chartMaxAgeSlider');
   if (!slider) return;
-  const minAge = Math.min(currentAge + 5, 95);  // 最低でも5年は表示
+  // 最低でも5年は表示。step=5 なので min も5の倍数にしないと上限が100にならない（例: min46 → 96歳止まり）
+  const minAge = Math.min(Math.ceil((currentAge + 5) / 5) * 5, 95);
   slider.min = minAge;
-  if (chartMaxAge < minAge) {
-    chartMaxAge = minAge;
-    slider.value = minAge;
-    document.getElementById('chartMaxAgeVal').textContent = `${minAge}歳まで`;
-  }
-  slider.value = chartMaxAge;
+  slider.value = Math.max(chartMaxAge, minAge);
+  // スライダーの刻みに丸められた値を正とする（過去に保存された 96 などもここで揃う）
+  chartMaxAge = +slider.value;
+  document.getElementById('chartMaxAgeVal').textContent = `${chartMaxAge}歳まで`;
 }
 
 function toggleCrash() {
@@ -1184,59 +1204,93 @@ function toggleRecovery() {
 }
 
 // ============================================================
+//  1年分の収支（simulate / runMonteCarlo 共通）
+// ============================================================
+// 金額はすべて現在価値。戻り値:
+//   flow              … 資産への実際の出入り（取り崩し税込み）
+//   contribution      … 実際に積み立てた額（FIRE前のみ）
+//   principalAddition … 元本（グラフの青）への加算額
+//   displayCashflow   … 明細テーブルのCF列
+function calcYearFlow(age, p) {
+  const eduCost    = getEduCostForYear(age, p.currentAge);
+  // 65歳以降は生活費割合を適用
+  const expense    = age >= 65 ? p.annualExpense * p.livingCostRatio65 : p.annualExpense;
+  // 完全FIRE年齢以降は副収入=0
+  const sideIncome = age < p.fullFireAge ? p.annualSideIncome : 0;
+  // 取り崩し税（20%）: 手元に d 残すには d÷0.8 を売却する必要がある
+  const withdraw = d => p.withdrawalTaxEnabled ? d / 0.8 : d;
+
+  if (age < p.fireAge) {
+    // ── FIRE前：手取りから生活費・教育費を払った残りから積み立て ──
+    // 残りが積立額に届かなければ積立を減らし、マイナスなら資産から取り崩す
+    const surplus      = p.afterTaxIncome - expense - eduCost;
+    const contribution = Math.max(0, Math.min(p.annualSavings, surplus));
+    const flow         = surplus >= 0 ? contribution : -withdraw(-surplus);
+    return {
+      eduCost, expense, sideIncome, contribution, flow,
+      principalAddition: contribution,
+      displayCashflow:   surplus >= 0 ? surplus - contribution : flow
+    };
+  }
+
+  let cf, principalAddition;
+  if (age < 65) {
+    // ── SideFIRE期間（〜65歳未満）──
+    cf = sideIncome - expense - eduCost;
+    principalAddition = 0;
+  } else {
+    // ── 65歳以降：年金開始 ──
+    const deficit = Math.max(0, expense + eduCost - sideIncome);
+    cf = sideIncome + p.annualPension - expense - eduCost;
+    principalAddition = Math.max(0, p.annualPension - deficit);
+  }
+  const flow = cf < 0 ? -withdraw(-cf) : cf;
+  return { eduCost, expense, sideIncome, contribution: 0, flow, principalAddition, displayCashflow: flow };
+}
+
+// ============================================================
 //  モンテカルロ暴落シミュレーション
 // ============================================================
 function runMonteCarlo(mcParams) {
   const {
     currentAge, currentAssets, returnRate,
-    afterTaxIncome, annualSavings, annualExpense, annualSideIncome, annualPension,
-    fireAge, fullFireAge, livingCostRatio65,
-    withdrawalTaxEnabled: wtax,
     crashProb, crashMag, numSims,
     recoveryEnabled: recov, recoveryYears: recovYrs
   } = mcParams;
 
   const endAge = 100;
   const numYears = endAge - currentAge + 1;
+  // 収支は乱数に依存しないので年齢ごとに1回だけ計算する
+  const flows = [];
+  for (let age = currentAge; age <= endAge; age++) flows.push(calcYearFlow(age, mcParams).flow);
   const allPaths = [];
 
   for (let sim = 0; sim < numSims; sim++) {
     let asset = currentAssets;
     const path = [];
     let recoveryLeft = 0;  // 回復ブースト残り年数
+    let recoveryGap  = 1;  // 暴落がなかった場合の水準 ÷ 現在の水準（回復期間内に1へ戻す）
 
-    for (let age = currentAge; age <= endAge; age++) {
-      const eduCost         = getEduCostForYear(age, currentAge);
-      const effExpense      = age >= 65 ? annualExpense * livingCostRatio65 : annualExpense;
-      const effSideIncome   = age < fullFireAge ? annualSideIncome : 0;
-
-      let cf;
-      if (age < fireAge) {
-        const livingDeficit = Math.max(0, effExpense + eduCost - afterTaxIncome);
-        cf = annualSavings - livingDeficit;
-      } else if (age < 65) {
-        cf = effSideIncome - effExpense - eduCost;
-      } else {
-        cf = effSideIncome + annualPension - effExpense - eduCost;
-      }
-
+    for (let i = 0; i < numYears; i++) {
       // 暴落イベント（年初に発生）
       if (Math.random() < crashProb) {
         asset *= (1 - crashMag);
-        // 回復ブーストONなら回復カウンタをリセット（重ね掛け対応）
-        if (recov) recoveryLeft = recovYrs;
+        if (recov) {
+          recoveryGap /= (1 - crashMag);  // 回復中の再暴落は未回復分に上乗せ
+          recoveryLeft = recovYrs;
+        }
       }
 
-      // 回復ブースト: 回復期間中は実効利回りを加算
-      // 実効利回り = 通常利回り + 暴落幅÷回復期間
-      const effectiveRate = (recov && recoveryLeft > 0)
-        ? returnRate + crashMag / recovYrs
-        : returnRate;
-      if (recoveryLeft > 0) recoveryLeft--;
+      // 回復ブースト: 残りの回復期間で recoveryGap を均等に取り戻す倍率を利回りに掛ける
+      // （例: 40%下落・5年 → (1/0.6)^(1/5) ≒ 1.11倍/年。5年後に暴落なしの推移へ戻る）
+      let boost = 1;
+      if (recov && recoveryLeft > 0) {
+        boost = Math.pow(recoveryGap, 1 / recoveryLeft);
+        recoveryGap /= boost;
+        recoveryLeft--;
+      }
 
-      if (wtax && cf < 0) cf = cf / 0.8;
-
-      asset = Math.max(0, asset * (1 + effectiveRate) + cf);
+      asset = Math.max(0, asset * (1 + returnRate) * boost + flows[i]);
       path.push(Math.round(asset));
     }
     allPaths.push(path);
@@ -1277,7 +1331,7 @@ function toggleWithdrawalTax() {
   simulate();
 }
 
-// 日本の給与所得税（概算）: 給与所得控除 → 課税所得 → 所得税(累進) + 住民税(10%) + 社会保険料(~14.5%)
+// 日本の給与所得税（概算）: 給与所得控除・社会保険料控除・基礎控除 → 課税所得 → 所得税(累進) + 住民税(10%) + 社会保険料(~14.5%)
 function calcAfterTaxIncome(grossMan) {
   const gross = grossMan * 10000; // 円換算
 
@@ -1290,10 +1344,14 @@ function calcAfterTaxIncome(grossMan) {
   else if (gross <= 8_500_000)  deduction = gross * 0.1 + 1_100_000;
   else                          deduction = 1_950_000;
 
-  // 基礎控除（2020年〜）
-  const basicDeduction = gross <= 24_000_000 ? 480_000 : 0;
+  // 社会保険料（概算: 健保+厚年+雇用 ≒ 14.5%）。支払った全額が社会保険料控除になる
+  const socialInsurance = gross * 0.145;
 
-  const taxableIncome = Math.max(0, gross - deduction - basicDeduction);
+  // 基礎控除（2020年〜）: 所得税48万・住民税43万
+  const basicDeduction         = gross <= 24_000_000 ? 480_000 : 0;
+  const residentBasicDeduction = gross <= 24_000_000 ? 430_000 : 0;
+
+  const taxableIncome = Math.max(0, gross - deduction - socialInsurance - basicDeduction);
 
   // 所得税（累進）
   let incomeTax;
@@ -1306,11 +1364,8 @@ function calcAfterTaxIncome(grossMan) {
   else                                  incomeTax = taxableIncome * 0.45 - 4_796_000;
   incomeTax *= 1.021; // 復興特別所得税
 
-  // 住民税（課税所得の10%）
-  const municipalTax = taxableIncome * 0.10;
-
-  // 社会保険料（概算: 健保+厚年+雇用 ≒ 14.5%）
-  const socialInsurance = gross * 0.145;
+  // 住民税（課税所得の10%。基礎控除が所得税より5万円少ない）
+  const municipalTax = Math.max(0, gross - deduction - socialInsurance - residentBasicDeduction) * 0.10;
 
   const netYen = gross - incomeTax - municipalTax - socialInsurance;
   return Math.round(netYen / 10000); // 万円
@@ -1331,6 +1386,9 @@ function simulate() {
   const fullFireAge    = getNum('fullFireAge',      65);
   const returnRateRaw  = getNum('returnRate',      50);
   const returnRate     = returnRateRaw / 10 / 100;
+  const inflationRate  = getNum('inflationRate',   10) / 10 / 100;
+  // 金額はすべて現在価値で計算するため、資産は実質利回り（インフレ控除後）で増やす
+  const realRate       = (1 + returnRate) / (1 + inflationRate) - 1;
   const livingCostRatio65 = parseFloat(
     document.querySelector('input[name="livingCostRatio65"]:checked')?.value || '1.00'
   );
@@ -1345,6 +1403,8 @@ function simulate() {
     const rate = annualIncome > 0 ? Math.round((1 - afterTaxIncome / annualIncome) * 100) : 0;
     afterTaxDisplay.textContent = `手取り推定: 約 ${afterTaxIncome.toLocaleString()} 万円（控除率 ${rate}%）`;
   }
+  const realRateHint = document.getElementById('realRateHint');
+  if (realRateHint) realRateHint.textContent = `→ 実質利回り ${(realRate * 100).toFixed(1)}%（インフレ控除後）`;
 
   const annualExpense    = monthlyExpense  * 12;
   const annualSideIncome = sideIncomeM    * 12;
@@ -1352,9 +1412,11 @@ function simulate() {
   const annualSavings    = monthlySavings * 12;
 
   // 目標額（SideFIRE期間の不足分ベース）
-  const target4pct   = annualExpense * 25;
+  // 取り崩し税ONの場合、必要取り崩し額が1.25倍（税20%分）になるため目標額も増加
+  const taxMult      = withdrawalTaxEnabled ? (1 / 0.8) : 1;
+  const target4pct   = annualExpense * 25 * taxMult;
   const shortfallAnn = Math.max(0, (monthlyExpense - sideIncomeM) * 12);
-  const targetShort  = shortfallAnn > 0 ? shortfallAnn * 25 : 0;
+  const targetShort  = shortfallAnn > 0 ? shortfallAnn * 25 * taxMult : 0;
 
   const endAge = 100;
   const ages = [];
@@ -1362,61 +1424,31 @@ function simulate() {
   const gainData      = [];
   const tableRows     = [];
 
+  const flowParams = {
+    currentAge, afterTaxIncome, annualSavings, annualExpense, annualSideIncome, annualPension,
+    fireAge, fullFireAge, livingCostRatio65, withdrawalTaxEnabled
+  };
+
   let asset               = currentAssets;
   let cumulativePrincipal = currentAssets;
   let achieve4Age     = null;
   let achieveShortAge = null;
+  let savingsShortYears = 0;  // FIRE前に積立額を確保できない年数
 
   for (let age = currentAge; age <= endAge; age++) {
     ages.push(age);
-    const eduCost = getEduCostForYear(age, currentAge);
+    const f = calcYearFlow(age, flowParams);
+    if (age < fireAge && f.contribution < annualSavings) savingsShortYears++;
 
-    // 65歳以降は生活費割合を適用
-    const effectiveExpense = age >= 65 ? annualExpense * livingCostRatio65 : annualExpense;
-    // 完全FIRE年齢以降は副収入=0
-    const effectiveSideIncome = age < fullFireAge ? annualSideIncome : 0;
-
-    let annualCashflow;
-    let principalAddition = 0;
-
-    if (age < fireAge) {
-      // ── FIRE前：積み立て投資 + 生活費不足分は資産から補填 ──
-      // 収入で生活費・教育費をまかなえない分だけ資産を取り崩す
-      const livingDeficit = Math.max(0, effectiveExpense + eduCost - afterTaxIncome);
-      annualCashflow    = annualSavings - livingDeficit;
-      principalAddition = annualSavings; // 元本は積立額のみで増加（マイナスにしない）
-      // ※ 資産がクリップにより元本を下回ったとき、利益から先に消費される
-
-    } else if (age < 65) {
-      // ── SideFIRE期間（〜65歳未満）──
-      annualCashflow    = effectiveSideIncome - effectiveExpense - eduCost;
-      principalAddition = 0;
-
-    } else {
-      // ── 65歳以降：年金開始 ──
-      const livingCost    = effectiveExpense + eduCost;
-      const deficit       = Math.max(0, livingCost - effectiveSideIncome);
-      const pensionSurplus = Math.max(0, annualPension - deficit);
-
-      annualCashflow    = effectiveSideIncome + annualPension - livingCost;
-      principalAddition = pensionSurplus;
-    }
-
-    // 取り崩し税（20%）: CF赤字なら投資資産から取り崩し
-    let effectiveCashflow = annualCashflow;
-    if (withdrawalTaxEnabled && effectiveCashflow < 0) {
-      effectiveCashflow = effectiveCashflow / 0.8;
-    }
-
-    // 資産更新（年複利）
+    // 資産更新（年複利・実質利回り）
     const prevAsset = asset;
-    const investmentReturn = Math.round(prevAsset * returnRate);  // 今年の利回り益
-    asset = asset * (1 + returnRate) + effectiveCashflow;
+    const investmentReturn = Math.round(prevAsset * realRate);  // 今年の利回り益
+    asset = asset * (1 + realRate) + f.flow;
     if (asset < 0) asset = 0;
     const assetChange = Math.round(asset - prevAsset);  // 前年比（利回り＋収支）
 
     // 元本更新
-    cumulativePrincipal += principalAddition;
+    cumulativePrincipal += f.principalAddition;
     // asset が cumulativePrincipal を下回ったらクリップ。
     // こうすることで、その後 asset が回復した際に
     // 回復分が「運用益（水色）」として表示される。
@@ -1432,20 +1464,16 @@ function simulate() {
     if (achieveShortAge === null && targetShort > 0 && asset >= targetShort)  achieveShortAge = age;
 
     // 明細テーブル用（収入は手取り表示）
-    const income = age < fireAge ? afterTaxIncome : effectiveSideIncome;
-    // FIRE前のCF表示: 手取り − 生活費 − 教育費 − 積み立て（積み立ては収入からの支出）
-    const displayCashflow = age < fireAge
-      ? Math.round(afterTaxIncome - effectiveExpense - eduCost - annualSavings)
-      : Math.round(effectiveCashflow);
+    const income = age < fireAge ? afterTaxIncome : f.sideIncome;
     tableRows.push({
       age,
       asset:            Math.round(asset),
       income:           Math.round(income),
-      expense:          Math.round(effectiveExpense),
-      eduCost:          Math.round(eduCost),
+      expense:          Math.round(f.expense),
+      eduCost:          Math.round(f.eduCost),
       pension:          age >= 65 ? Math.round(annualPension) : 0,
-      savings:          age < fireAge ? Math.round(annualSavings) : 0,
-      cashflow:         displayCashflow,
+      savings:          age < fireAge ? Math.round(f.contribution) : 0,
+      cashflow:         Math.round(f.displayCashflow),
       investmentReturn,
       assetChange,
       isFire:     age === fireAge,
@@ -1454,22 +1482,29 @@ function simulate() {
     });
   }
 
+  const savingsWarning = document.getElementById('savingsWarning');
+  if (savingsWarning) {
+    savingsWarning.style.display = savingsShortYears > 0 ? 'block' : 'none';
+    savingsWarning.textContent =
+      `⚠ 手取り−生活費−教育費 が積立額に届かない年が${savingsShortYears}年あります（その年は積立を減らし、赤字分は資産から取り崩して計算）`;
+  }
+
   const totalEdu   = children.reduce((s, c) => s + getTotalEduCostForChild(c), 0);
   const finalAsset = principalData.at(-1) + gainData.at(-1);
 
   // カード更新
   document.getElementById('card-target4').textContent = formatMan(target4pct);
   document.getElementById('card-target4-sub').textContent =
-    achieve4Age ? `${achieve4Age}歳で達成見込み` : '90歳までに未達成';
+    achieve4Age ? `${achieve4Age}歳で達成見込み` : '100歳までに未達成';
 
   document.getElementById('card-targetShort').textContent = formatMan(targetShort);
   document.getElementById('card-targetShort-sub').textContent =
     targetShort === 0 ? '収入でカバー済み' :
-    (achieveShortAge ? `${achieveShortAge}歳で達成見込み` : '90歳までに未達成');
+    (achieveShortAge ? `${achieveShortAge}歳で達成見込み` : '100歳までに未達成');
 
   document.getElementById('card-edu').textContent = formatMan(totalEdu);
   document.getElementById('card-final').textContent = formatMan(finalAsset);
-  document.getElementById('card-final-sub').textContent = '90歳時点';
+  document.getElementById('card-final-sub').textContent = '100歳時点';
 
   // バナー
   const banner = document.getElementById('banner');
@@ -1496,11 +1531,7 @@ function simulate() {
     const crashMag  = getNum('crashMag',  40) / 100;
     const recoveryYears = getNum('recoveryYears', 5);
     crashData = runMonteCarlo({
-      currentAge, currentAssets, returnRate,
-      afterTaxIncome, annualSavings, annualExpense: annualExpense,
-      annualSideIncome, annualPension,
-      fireAge, fullFireAge, livingCostRatio65,
-      withdrawalTaxEnabled,
+      ...flowParams, currentAssets, returnRate: realRate,
       crashProb, crashMag, numSims: 300,
       recoveryEnabled, recoveryYears
     });
@@ -1863,7 +1894,7 @@ function updateAssetTable(rows, fireAge, fullFireAge) {
           <th>生活費(万)</th>
           <th>教育費(万)</th>
           <th>年金(万)</th>
-          <th title="FIRE前: 手取り−生活費−教育費−積立 / SideFIRE: 副収入−生活費−教育費 / 65歳〜: +年金">CF(万)</th>
+          <th title="FIRE前: 手取り−生活費−教育費−積立（赤字なら資産からの取り崩し額） / SideFIRE: 副収入−生活費−教育費 / 65歳〜: +年金">CF(万)</th>
           <th>利回り益(万)</th>
           <th>前年比(万)</th>
         </tr>
@@ -1900,6 +1931,10 @@ document.getElementById('fullFireAge').addEventListener('input', function() {
 });
 document.getElementById('returnRate').addEventListener('input', function() {
   document.getElementById('returnRateVal').textContent = `${(this.value / 10).toFixed(1)}%`;
+  simulate();
+});
+document.getElementById('inflationRate').addEventListener('input', function() {
+  document.getElementById('inflationRateVal').textContent = `${(this.value / 10).toFixed(1)}%`;
   simulate();
 });
 
