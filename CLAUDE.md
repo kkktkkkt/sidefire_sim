@@ -95,6 +95,6 @@ targets, via `buildAnnotations()`/`makeCrashDatasets()`), `updateEduTable()` (pe
 cost breakdown), and `updateAssetTable()` (full year-by-year ledger with highlighted FIRE/pension
 rows). None of them share state beyond the arrays `simulate()` passes in.
 
-**Children** are plain objects in the `children[]` array manipulated by `addChild`/`removeChild`/
+**Children** are plain objects in the `children[]` array manipulated by `addChild`/`removeChildEntry`/
 `updateChild*`, re-rendered wholesale via `renderChildren()` (innerHTML rebuild, not incremental
 DOM patching) on every mutation.

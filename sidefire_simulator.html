@@ -956,7 +956,9 @@ function addChild(preset = null) {
   simulate();
 }
 
-function removeChild(id) {
+// ※ 名前を removeChild にしてはいけない: インラインの onclick 内では要素自身の Node.removeChild に解決され、
+//   TypeError になってボタンが効かなくなる（addChild などは Node のメソッドと衝突しないので問題ない）
+function removeChildEntry(id) {
   children = children.filter(c => c.id !== id);
   renderChildren();
   simulate();
@@ -971,7 +973,7 @@ function renderChildren() {
     div.innerHTML = `
       <div class="child-card-header">
         <div class="child-card-title">子供 ${idx + 1}</div>
-        <button class="btn-remove" onclick="removeChild(${child.id})">×</button>
+        <button class="btn-remove" onclick="removeChildEntry(${child.id})">×</button>
       </div>
       <div class="child-grid">
         <div class="form-group full-width">

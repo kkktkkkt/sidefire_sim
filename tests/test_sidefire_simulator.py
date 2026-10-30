@@ -83,6 +83,17 @@ def parse_man_yen(text):
 # Test bodies. Each receives a fresh `page` already loaded with the simulator.
 # ----------------------------------------------------------------------------
 
+def remove_all_children_via_ui(page):
+    """Clicks every child card's × button. Bounded so a button that does nothing fails instead of looping forever."""
+    for _ in range(20):
+        n = len(page.query_selector_all(".child-card"))
+        if n == 0:
+            return
+        page.click(".child-card:last-child .btn-remove")
+        assert len(page.query_selector_all(".child-card")) == n - 1, "clicking x did not remove a child card"
+    raise AssertionError("child cards were not all removed")
+
+
 def test_format_man(page):
     vals = page.evaluate(
         """() => ({
@@ -287,8 +298,7 @@ def test_add_and_remove_child_via_ui(page):
     assert len(page.query_selector_all(".child-card")) == initial + 1
 
     # remove every child, including the ones present at page load
-    while page.query_selector_all(".child-card"):
-        page.click(".child-card:last-child .btn-remove")
+    remove_all_children_via_ui(page)
     assert len(page.query_selector_all(".child-card")) == 0
 
     edu_card = page.inner_text("#card-edu")
@@ -334,8 +344,7 @@ def test_localstorage_persists_across_reload(page):
 
 
 def test_zero_children_persists_across_reload(page):
-    while page.query_selector_all(".child-card"):
-        page.click(".child-card:last-child .btn-remove")
+    remove_all_children_via_ui(page)
     page.reload()
     page.wait_for_function("typeof Chart !== 'undefined'")
     assert len(page.query_selector_all(".child-card")) == 0
